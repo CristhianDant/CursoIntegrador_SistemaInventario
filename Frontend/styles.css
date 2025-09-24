@@ -1,0 +1,90 @@
+/* ===========================
+   VARIABLES SIMPLIFICADAS
+=========================== */
+:root {
+  --primary: #ff6f61;
+  --primary-dark: #ff3b2e;
+  --bg-gradient-1: #ffdde1;
+  --bg-gradient-2: #ee9ca7;
+  --font-base: 'Segoe UI', system-ui, -apple-system, "Helvetica Neue", Arial;
+  --container-max-width: 420px;
+}
+
+/* ===========================
+   BASE
+=========================== */
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-base);
+  background: linear-gradient(135deg, var(--bg-gradient-1), var(--bg-gradient-2));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===========================
+   LOGIN CONTAINER & CARD
+=========================== */
+.login-container {
+  width: 100%;
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+  padding: 1.25rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.login-card {
+  border-radius: 1rem;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  background: #fff;
+  padding: 1.5rem;
+  border: none;
+  width: 100%;
+}
+
+.login-card h3 {
+  margin-bottom: 1.25rem;
+  text-align: center;
+  color: #e04d3f; /* darken de primary */
+}
+
+/* ===========================
+   INPUTS
+=========================== */
+.input-group .input-group-text {
+  background: transparent;
+  border-left: 0;
+}
+
+.input-group .form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.2rem rgba(255, 111, 97, 0.25);
+}
+
+/* ===========================
+   BOTONES & LINKS
+=========================== */
+.btn-primary {
+  background: var(--primary);
+  border: none;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.link-secondary {
+  color: #e14b3d;
+  text-decoration: none;
+}
+
+.link-secondary:hover {
+  text-decoration: underline;
+}
+
