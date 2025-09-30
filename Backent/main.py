@@ -3,6 +3,7 @@ from utils.logging_config import setup_logging
 from modules.empresa import router as empresa_router
 from modules.proveedores import router as proveedores_router
 from modules.insumo import router as insumo_router
+from modules.productos_terminados import router as productos_terminados_router
 
 # Configurar el logging antes de crear la aplicación
 setup_logging()
@@ -17,6 +18,7 @@ app = FastAPI(
 app.include_router(empresa_router.router, prefix="/api/v1/empresas", tags=["Empresas"])
 app.include_router(proveedores_router.router, prefix="/api/v1/proveedores", tags=["Proveedores"])
 app.include_router(insumo_router.router, prefix="/api/v1/insumos", tags=["Insumos"])
+app.include_router(productos_terminados_router.router, prefix="/api/v1/productos_terminados", tags=["Productos Terminados"])
 
 @app.get("/")
 def read_root():
