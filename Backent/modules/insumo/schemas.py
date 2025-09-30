@@ -1,40 +1,37 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+from decimal import Decimal
+from enums.unidad_medida import UnidadMedidaEnum
 
 class InsumoBase(BaseModel):
     codigo: str = Field(..., max_length=50)
     nombre: str = Field(..., max_length=255)
     descripcion: Optional[str] = None
-    unidad_medida: str = Field(..., max_length=50)
-    stock_actual: float
-    stock_minimo: float
-    fecha_caducidad: Optional[datetime] = None
-    perecible: bool = False
-    precio_promedio: Optional[float] = None
-    categoria: Optional[str] = Field(None, max_length=100)
+    unidad_medida: UnidadMedidaEnum
+    stock_minimo: Optional[Decimal] = 0
+    perecible: Optional[bool] = False
+    categoria: Optional[str] = None
 
 class InsumoCreate(InsumoBase):
     pass
 
 class InsumoUpdate(BaseModel):
-    codigo: Optional[str] = Field(None, max_length=50)
-    nombre: Optional[str] = Field(None, max_length=255)
+    codigo: Optional[str] = None
+    nombre: Optional[str] = None
     descripcion: Optional[str] = None
-    unidad_medida: Optional[str] = Field(None, max_length=50)
-    stock_actual: Optional[float] = None
-    stock_minimo: Optional[float] = None
-    fecha_caducidad: Optional[datetime] = None
+    unidad_medida: Optional[UnidadMedidaEnum] = None
+    stock_minimo: Optional[Decimal] = None
     perecible: Optional[bool] = None
-    precio_promedio: Optional[float] = None
-    categoria: Optional[str] = Field(None, max_length=100)
-    anulado: Optional[bool] = None
+    categoria: Optional[str] = None
 
 class Insumo(InsumoBase):
     id_insumo: int
+    stock_actual: Decimal
+    fecha_caducidad: Optional[datetime] = None
+    precio_promedio: Optional[Decimal] = 0
     fecha_registro: datetime
     anulado: bool
 
     class Config:
         orm_mode = True
-
