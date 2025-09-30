@@ -21,7 +21,7 @@ class UsuarioService(UsuarioServiceInterface):
 
     def create(self, db: Session, user: UsuarioCreate) -> Usuario:
         hashed_password = get_password_hash(user.password)
-        user_data = user.dict()
+        user_data = user.model_dump()
         user_data["password"] = hashed_password
         user_data["es_admin"] = False  # Asegurar que no se creen administradores
         return self.repository.create(db, user_data)
