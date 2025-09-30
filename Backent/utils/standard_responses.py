@@ -59,3 +59,17 @@ def api_response_not_found(error_message: str) -> JSONResponse:
     response_body = {"data": error_message, "success": False, "code": 404}
     logger.opt(depth=1).warning(f"Error 404: {error_message}")
     return JSONResponse(status_code=404, content=jsonable_encoder(response_body))
+
+def api_response_unauthorized(error_message: str) -> JSONResponse:
+    """
+    Genera una respuesta HTTP 401 (Unauthorized) estandarizada y registra el error.
+
+    Args:
+        error_message (str): El mensaje de error a incluir en la respuesta.
+
+    Returns:
+        JSONResponse: Una respuesta JSON con código 401.
+    """
+    response_body = {"data": error_message, "success": False, "code": 401}
+    logger.opt(depth=1).warning(f"Error 401: {error_message}")
+    return JSONResponse(status_code=401, content=jsonable_encoder(response_body))
