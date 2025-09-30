@@ -1,57 +1,43 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from modules.insumo import service
-from modules.insumo.schemas import Insumo, InsumoCreate, InsumoUpdate
 from database import get_db
-from utils.standard_responses import api_response_ok, api_response_bad_request, api_response_internal_server_error, api_response_not_found
+from modules.insumo.schemas import Insumo, InsumoCreate, InsumoUpdate
+from modules.insumo.service import InsumoService
+from typing import List
 
 router = APIRouter(
     prefix="/insumos",
-    tags=["insumos"]
+    tags=["insumos"],
 )
 
-@router.post("/")
-def create_insumo(insumo: InsumoCreate, db: Session = Depends(get_db)):
-    try:
-        new_insumo = service.create_insumo(db=db, insumo=insumo)
-        return api_response_ok(data=new_insumo)
-    except Exception as e:
-        return api_response_internal_server_error(error_message=str(e))
+def get_insumo_service(db: Session = Depends(get_db)) -> InsumoService:
+    return InsumoService(db)
 
-@router.get("/")
-def read_insumos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    try:
-        insumos = service.get_insumos(db, skip=skip, limit=limit)
-        return api_response_ok(data=insumos)
-    except Exception as e:
-        return api_response_internal_server_error(error_message=str(e))
+@router.post("/", response_model=Insumo)
+def create_insumo(insumo: InsumoCreate, service: InsumoService = Depends(get_insumo_service)):
+    return service.create_insumo(insumo)
 
-@router.get("/{insumo_id}")
-def read_insumo(insumo_id: int, db: Session = Depends(get_db)):
-    try:
-        db_insumo = service.get_insumo(db, insumo_id=insumo_id)
-        if db_insumo is None:
-            return api_response_not_found(error_message="Insumo not found")
-        return api_response_ok(data=db_insumo)
-    except Exception as e:
-        return api_response_internal_server_error(error_message=str(e))
+@router.get("/", response_model=List[Insumo])
+def read_insumos(skip: int = 0, limit: int = 100, service: InsumoService = Depends(get_insumo_service)):
+    return service.get_insumos(skip, limit)
 
-@router.put("/{insumo_id}")
-def update_insumo(insumo_id: int, insumo: InsumoUpdate, db: Session = Depends(get_db)):
-    try:
-        db_insumo = service.update_insumo(db, insumo_id=insumo_id, insumo=insumo)
-        if db_insumo is None:
-            return api_response_not_found(error_message="Insumo not found")
-        return api_response_ok(data=db_insumo)
-    except Exception as e:
-        return api_response_internal_server_error(error_message=str(e))
+@router.get("/{insumo_id}", response_model=Insumo)
+def read_insumo(insumo_id: int, service: InsumoService = Depends(get_insumo_service)):
+    db_insumo = service.get_insumo(insumo_id)
+    if db_insumo is None:
+        raise HTTPException(status_code=404, detail="Insumo no encontrado")
+    return db_insumo
 
-@router.delete("/{insumo_id}")
-def delete_insumo(insumo_id: int, db: Session = Depends(get_db)):
-    try:
-        db_insumo = service.delete_insumo(db, insumo_id=insumo_id)
-        if db_insumo is None:
-            return api_response_not_found(error_message="Insumo not found")
-        return api_response_ok(data=db_insumo)
-    except Exception as e:
-        return api_response_internal_server_error(error_message=str(e))
+@router.put("/{insumo_id}", response_model=Insumo)
+def update_insumo(insumo_id: int, insumo: InsumoUpdate, service: InsumoService = Depends(get_insumo_service)):
+    db_insumo = service.update_insumo(insumo_id, insumo)
+    if db_insumo is None:
+        raise HTTPException(status_code=404, detail="Insumo no encontrado")
+    return db_insumo
+
+@router.delete("/{insumo_id}", response_model=Insumo)
+def delete_insumo(insumo_id: int, service: InsumoService = Depends(get_insumo_service)):
+    db_insumo = service.delete_insumo(insumo_id)
+    if db_insumo is None:
+        raise HTTPException(status_code=404, detail="Insumo no encontrado")
+    return db_insumo

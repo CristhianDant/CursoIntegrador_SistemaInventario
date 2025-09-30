@@ -1,11 +1,10 @@
-from sqlalchemy import Column, BigInteger, VARCHAR, TEXT, DECIMAL, TIMESTAMP, BOOLEAN
-from sqlalchemy.sql import func
+from sqlalchemy import Column, BIGINT, VARCHAR, TEXT, DECIMAL, TIMESTAMP, BOOLEAN, func
 from database import Base
 
 class Insumo(Base):
-    __tablename__ = 'insumo'
+    __tablename__ = "insumo"
 
-    id_insumo = Column(BigInteger, primary_key=True, autoincrement=True)
+    id_insumo = Column(BIGINT, primary_key=True, index=True, autoincrement=True)
     codigo = Column(VARCHAR(50), unique=True, nullable=False)
     nombre = Column(VARCHAR(255), nullable=False)
     descripcion = Column(TEXT)
