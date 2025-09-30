@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     POST_DB: str
     POST_PORT: str
     SECRET_KEY: str
+    ALGORITHM_TOK: str
+    ACCESS_TOKEN_EXPIRE_MINUTES: int
 
     class Config:
         env_file = ".env"
