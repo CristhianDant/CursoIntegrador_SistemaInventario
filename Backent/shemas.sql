@@ -55,7 +55,6 @@ CREATE TABLE "insumo" (
   "unidad_medida" VARCHAR(50) NOT NULL,
   "stock_actual" DECIMAL(12,4) NOT NULL DEFAULT 0,
   "stock_minimo" DECIMAL(12,4) NOT NULL DEFAULT 0,
-  "fecha_caducidad" TIMESTAMP,
   "perecible" BOOLEAN NOT NULL DEFAULT false,
   "precio_promedio" DECIMAL(12,4) DEFAULT 0,
   "categoria" VARCHAR(100),

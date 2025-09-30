@@ -28,7 +28,6 @@ class InsumoUpdate(BaseModel):
 class Insumo(InsumoBase):
     id_insumo: int
     stock_actual: Decimal
-    fecha_caducidad: Optional[datetime] = None
     precio_promedio: Optional[Decimal] = 0
     fecha_registro: datetime
     anulado: bool
