@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from utils.logging_config import setup_logging
 from modules.empresa import router as empresa_router
 from modules.proveedores import router as proveedores_router
@@ -21,6 +22,19 @@ app = FastAPI(
     title="API de Inventario",
     description="API RESTful para gestionar un sistema de inventario.",
     version="1.0.0"
+)
+
+# Configurar CORS
+origins = [
+    "http://localhost:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Incluir los routers de los módulos
