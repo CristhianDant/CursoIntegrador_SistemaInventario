@@ -16,10 +16,10 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState("");
   const [currentPage, setCurrentPage] = useState("dashboard");
-  const [showLanding, setShowLanding] = useState(true);
+  const [showLanding, setShowLanding] = useState(false);
 
-  const handleLogin = (username: string) => {
-    setCurrentUser(username);
+  const handleLogin = (email: string) => {
+    setCurrentUser(email);
     setIsLoggedIn(true);
     setShowLanding(false);
   };

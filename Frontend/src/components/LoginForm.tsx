@@ -5,29 +5,48 @@ import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Alert, AlertDescription } from "./ui/alert";
 import { ChefHat } from "lucide-react";
+import { API_BASE_URL } from "../constants";
 
 interface LoginFormProps {
-  onLogin: (username: string) => void;
+  onLogin: (email: string) => void;
 }
 
 export function LoginForm({ onLogin }: LoginFormProps) {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Simulación de autenticación
-    if (username && password) {
-      if (username === "admin" && password === "123456") {
-        onLogin(username);
-        setError("");
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        onLogin(email); // o data.user.email si el backend devuelve info
       } else {
-        setError("Credenciales incorrectas. Use: admin / 123456");
+        const errorData = await response.json();
+        console.error('Error en login:', errorData);
+        setError(errorData.message || 'Error en el login');
       }
-    } else {
-      setError("Por favor complete todos los campos");
+    } catch (err) {
+      console.error('Error de conexión con el servidor:', err);
+      setError('Error de conexión con el servidor');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -48,13 +67,13 @@ export function LoginForm({ onLogin }: LoginFormProps) {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Usuario</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="username"
-                type="text"
-                placeholder="Ingrese su usuario"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="email"
+                type="email"
+                placeholder="Ingrese su email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -74,8 +93,8 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                 </AlertDescription>
               </Alert>
             )}
-            <Button type="submit" className="w-full">
-              Iniciar Sesión
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Iniciando..." : "Iniciar Sesión"}
             </Button>
           </form>
          
