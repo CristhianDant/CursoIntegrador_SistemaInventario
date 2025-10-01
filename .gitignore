@@ -1,4 +1,11 @@
-Frontend/node_modules/
+# Dependencias de Node
+/Frontend/node_modules
+/Backent/.venv
+
+# Archivos de caché/compilación
+/Backent/__pycache__
+/Frontend/dist
+
 # Dependencies
 node_modules/
 npm-debug.log*
