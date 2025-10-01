@@ -7,6 +7,7 @@ from modules.productos_terminados import router as productos_terminados_router
 from modules.usuario import router as usuario_router
 from modules.permisos import router as permisos_router
 from modules.login import router as login_router
+from modules.recetas import router as recetas_router
 
 # Configurar el logging antes de crear la aplicación
 setup_logging()
@@ -25,6 +26,7 @@ app.include_router(productos_terminados_router.router, prefix="/api/v1/productos
 app.include_router(usuario_router.router, prefix="/api/v1/usuarios", tags=["Usuarios"])
 app.include_router(permisos_router.router, prefix="/api/v1", tags=["Permisos"])
 app.include_router(login_router.router, prefix="/api/v1", tags=["Autenticación"])
+app.include_router(recetas_router.router, prefix="/api/v1/recetas", tags=["Recetas"])
 
 @app.get("/")
 def read_root():
