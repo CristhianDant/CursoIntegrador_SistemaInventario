@@ -20,7 +20,7 @@ INSERT INTO "usuario" (es_admin, nombre, apellidos, email, password) VALUES
 
 -- Asignación de todos los permisos al usuario administrador
 INSERT INTO "usuario_permisos" (id_user, id_permiso)
-SELECT
+SELECT 
     (SELECT id_user FROM "usuario" WHERE email = 'admin@email.com'),
     p.id_permiso
 FROM "permisos" p;

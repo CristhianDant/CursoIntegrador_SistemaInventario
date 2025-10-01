@@ -1,5 +1,3 @@
-    class Config:
-        from_attributes = True
 from pydantic import BaseModel
 from typing import Optional
 from decimal import Decimal
@@ -27,4 +25,5 @@ class MovimientoInsumo(MovimientoInsumoBase):
     fecha_movimiento: datetime.datetime
     anulado: bool
 
-
+    class Config:
+        from_attributes = True

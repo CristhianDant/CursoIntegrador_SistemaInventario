@@ -1,3 +1,12 @@
+from pydantic import BaseModel
+from typing import Optional
+from decimal import Decimal
+import datetime
+from enums.tipo_movimiento import TipoMovimientoEnum
+
+class MovimientoProductoTerminadoBase(BaseModel):
+    numero_movimiento: str
+    id_producto: int
     tipo_movimiento: TipoMovimientoEnum
     motivo: str
     cantidad: Decimal
@@ -17,13 +26,3 @@ class MovimientoProductoTerminado(MovimientoProductoTerminadoBase):
 
     class Config:
         from_attributes = True
-from pydantic import BaseModel
-from typing import Optional
-from decimal import Decimal
-import datetime
-from enums.tipo_movimiento import TipoMovimientoEnum
-
-class MovimientoProductoTerminadoBase(BaseModel):
-    numero_movimiento: str
-    id_producto: int
-
