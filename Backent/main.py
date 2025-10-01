@@ -10,6 +10,9 @@ from modules.login import router as login_router
 from modules.recetas import router as recetas_router
 from modules.orden_de_compra import router as orden_de_compra_router
 from modules.ingresos_productos import router as ingresos_productos_router
+from modules.calidad_desperdicio_merma import router as merma_router
+from modules.movimiento_insumos import router as movimiento_insumos_router
+from modules.movimiento_productos_terminados import router as movimiento_productos_terminados_router
 
 # Configurar el logging antes de crear la aplicación
 setup_logging()
@@ -31,6 +34,10 @@ app.include_router(login_router.router, prefix="/api/v1", tags=["Autenticación"
 app.include_router(recetas_router.router, prefix="/api/v1/recetas", tags=["Recetas"])
 app.include_router(orden_de_compra_router.router, prefix="/api/v1/ordenes_compra", tags=["Órdenes de Compra"])
 app.include_router(ingresos_productos_router.router, prefix="/api/v1/ingresos_productos", tags=["Ingresos de Productos"])
+app.include_router(merma_router.router, prefix="/api/v1/mermas", tags=["Mermas"])
+app.include_router(movimiento_insumos_router.router, prefix="/api/v1/movimientos_insumos", tags=["Movimientos de Insumos"])
+app.include_router(movimiento_productos_terminados_router.router, prefix="/api/v1/movimientos_productos_terminados", tags=["Movimientos de Productos Terminados"])
+
 
 @app.get("/")
 def read_root():
