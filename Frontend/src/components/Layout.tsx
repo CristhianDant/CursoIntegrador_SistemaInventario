@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "./ui/utils";
+import { MiLogo } from './Img/MiLogo';
 
 interface LayoutProps {
   children: ReactNode;
@@ -55,7 +56,7 @@ export function Layout({ children, currentPage, onPageChange, onLogout, username
       )}>
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center space-x-2">
-            <ChefHat className="h-8 w-8 text-orange-600" />
+            <MiLogo className="h-8 w-8 text-orange-600" />
             <span className="text-xl font-semibold text-gray-900">Pastelería Dulce Encanto</span>
           </div>
           <Button
