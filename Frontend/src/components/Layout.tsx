@@ -14,7 +14,13 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "./ui/utils";
-import { MiLogo } from './Img/MiLogo';
+import MiLogo from './Img/Pasteleria.svg?react';
+
+declare module '*.svg?react' {
+  import React from 'react'
+  const content: React.FunctionComponent<React.SVGProps<SVGSVGElement>>
+  export default content
+}
 
 interface LayoutProps {
   children: ReactNode;
