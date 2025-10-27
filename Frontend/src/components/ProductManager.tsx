@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, Edit, Trash2, Package, TrendingUp, Calendar, DollarSign, Percent, Gift, AlertTriangle } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -10,6 +10,7 @@ import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Textarea } from "./ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { API_BASE_URL } from "../constants";
 
 interface ProductMovement {
   id: number;
@@ -62,77 +63,8 @@ const availableRecipes = [
   { id: 4, name: "Cheesecake de Fresa", costPerServing: 1.25, category: "Postres" },
 ];
 
-const mockProducts: FinishedProduct[] = [
-  {
-    id: 1,
-    name: "Pastel de Chocolate Premium",
-    recipeId: 1,
-    recipeName: "Pastel de Chocolate Clásico",
-    category: "Pasteles",
-    currentStock: 5,
-    minStock: 2,
-    maxStock: 15,
-    unitCost: 5.67,
-    sellingPrice: 12.00,
-    profitMargin: 111.6,
-    expiryDate: "2024-09-05",
-    productionDate: "2024-09-02",
-    batchNumber: "PC240902001",
-    barcode: "7501234567890",
-    description: "Pastel de chocolate húmedo con glaseado premium",
-    status: 'Por Vencer',
-    movements: [
-      { id: 1, type: 'produccion', quantity: 8, date: "2024-09-02", batchNumber: "PC240902001" },
-      { id: 2, type: 'venta', quantity: 3, date: "2024-09-02" },
-    ]
-  },
-  {
-    id: 2,
-    name: "Galletas Artesanales Pack 12",
-    recipeId: 2,
-    recipeName: "Galletas de Mantequilla",
-    category: "Galletas",
-    currentStock: 0,
-    minStock: 5,
-    maxStock: 25,
-    unitCost: 0.96,
-    sellingPrice: 3.00,
-    profitMargin: 212.5,
-    expiryDate: "2024-09-15",
-    productionDate: "2024-09-01",
-    batchNumber: "GM240901001",
-    description: "Pack de 12 galletas artesanales de mantequilla",
-    status: 'Agotado',
-    movements: [
-      { id: 1, type: 'produccion', quantity: 10, date: "2024-09-01", batchNumber: "GM240901001" },
-      { id: 2, type: 'venta', quantity: 8, date: "2024-09-02" },
-      { id: 3, type: 'venta', quantity: 2, date: "2024-09-03" },
-    ]
-  },
-  {
-    id: 3,
-    name: "Crema Batida Premium",
-    recipeId: 3,
-    recipeName: "Crema Batida Especial",
-    category: "Postres",
-    currentStock: 8,
-    minStock: 3,
-    maxStock: 15,
-    unitCost: 2.30,
-    sellingPrice: 5.50,
-    profitMargin: 139.1,
-    expiryDate: "2024-09-04",
-    productionDate: "2024-09-01",
-    batchNumber: "CB240901001",
-    description: "Crema batida premium para decoración",
-    status: 'Por Vencer',
-    movements: [
-      { id: 1, type: 'produccion', quantity: 12, date: "2024-09-01", batchNumber: "CB240901001" },
-      { id: 2, type: 'venta', quantity: 4, date: "2024-09-02" },
-    ]
-  }
-];
 
+ 
 // Sistema de promociones automáticas
 const generatePromotionSuggestions = (products: FinishedProduct[]): PromotionSuggestion[] => {
   const suggestions: PromotionSuggestion[] = [];
@@ -215,7 +147,7 @@ const isComplementaryCategory = (category1: string, category2: string): boolean 
 };
 
 export function ProductManager() {
-  const [products, setProducts] = useState<FinishedProduct[]>(mockProducts);
+  const [products, setProducts] = useState<FinishedProduct[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -229,7 +161,61 @@ export function ProductManager() {
   const [promotionSuggestions, setPromotionSuggestions] = useState<PromotionSuggestion[]>([]);
   const [selectedPromotion, setSelectedPromotion] = useState<PromotionSuggestion | null>(null);
 
+  
   const categories = ["Pasteles", "Galletas", "Panes", "Postres", "Decoraciones"];
+
+ const fetchProducts = async () => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/v1/productos_terminados/`, { 
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+            throw new Error('Error al cargar productos desde el servidor.');
+        }
+
+        const data = await response.json();
+        
+        // Verifica que la respuesta tenga el formato { success: true, data: [...] }
+        if (data.success && Array.isArray(data.data)) {
+            
+            // ESTE ES EL MAPEO CRÍTICO DE NOMBRES
+            const loadedProducts: FinishedProduct[] = data.data.map((p: any) => ({
+                // Mapeo de DB (snake_case) a React (camelCase)
+                id: p.id_producto,               
+                name: p.nombre,                   
+                currentStock: parseFloat(p.stock_actual || 0),
+                minStock: parseFloat(p.stock_minimo || 0),   
+                sellingPrice: parseFloat(p.precio_venta || 0),
+                description: p.descripcion || "",
+                
+                // Valores de relleno necesarios para que la interfaz NO falle
+                recipeName: p.nombre_receta || "N/A",  // Si tienes este campo en tu API, úsalo
+                category: p.categoria || "Sin Categoría",
+                unitCost: parseFloat(p.costo_unitario || 0), // Si lo agregaste en la DB
+                profitMargin: 0.00, // Debe ser calculado: (sellingPrice - unitCost) / unitCost
+                expiryDate: p.fecha_vencimiento || new Date().toISOString().split('T')[0],
+                productionDate: p.fecha_produccion || new Date().toISOString().split('T')[0],
+                batchNumber: p.codigo_producto || "N/A",
+                status: 'Disponible', // O una función para calcular el estado
+                maxStock: 20,
+                recipeId: 0,
+                movements: [],
+            })) as FinishedProduct[];
+            
+            setProducts(loadedProducts);
+        }
+
+    } catch (error) {
+        console.error("Fallo la carga de productos. El error es:", error);
+    }
+};
+
+useEffect(() => {
+        // Llama a la función que realiza la petición a la API
+        fetchProducts(); 
+    }, []); // El array vacío '[]' es crucial para que se ejecute solo al inicio.
 
   // Generar sugerencias de promociones automáticamente
   useState(() => {
@@ -1089,3 +1075,4 @@ export function ProductManager() {
     </div>
   );
 }
+

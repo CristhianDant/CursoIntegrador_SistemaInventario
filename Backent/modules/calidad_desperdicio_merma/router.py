@@ -6,7 +6,10 @@ from modules.calidad_desperdicio_merma.schemas import Merma, MermaCreate, MermaU
 from modules.calidad_desperdicio_merma.service import MermaService
 from utils.standard_responses import api_response_ok, api_response_not_found, api_response_bad_request
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/mermas",
+    tags=["mermas"],
+)
 
 service = MermaService()
 

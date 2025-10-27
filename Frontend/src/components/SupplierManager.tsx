@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, Edit, Trash2, Building, Phone, Mail, MapPin, Star, Package } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Textarea } from "./ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Switch } from "./ui/switch";
+import { API_BASE_URL } from "../constants";
+
 
 interface SuppliedProduct {
   id: number;
@@ -23,279 +25,235 @@ interface SuppliedProduct {
   minOrder: number;
 }
 
-interface Supplier {
-  id: number;
-  companyName: string;
-  contactName: string;
-  email: string;
-  phone: string;
-  alternatePhone?: string;
-  address: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-  taxId: string; // RUC/RFC
-  website?: string;
-  category: string;
-  rating: number; // 1-5 stars
-  isActive: boolean;
-  preferredSupplier: boolean;
-  paymentTerms: string; // "Contado", "30 días", "60 días"
-  deliveryZone: string;
-  notes: string;
-  registrationDate: string;
-  lastOrderDate: string;
-  totalOrders: number;
-  totalAmount: number;
-  suppliedProducts: SuppliedProduct[];
+// 1. Interfaces de Datos
+interface Proveedor {
+    id_proveedor: number;
+    nombre: string;
+    ruc_dni: string;
+    numero_contacto: string;
+    email_contacto: string;
+    direccion_fiscal: string;
+    anulado: boolean; 
+    fecha_registro: string; // Para mostrar en la tabla
 }
 
-const supplierCategories = [
-  "Ingredientes Básicos",
-  "Productos Lácteos", 
-  "Carnes y Proteínas",
-  "Frutas y Verduras",
-  "Especias y Condimentos",
-  "Empaques y Envases",
-  "Equipos y Utensilios",
-  "Servicios"
+interface ProveedorFormData {
+    nombre: string;
+    ruc_dni: string;
+    numero_contacto: string;
+    email_contacto: string;
+    direccion_fiscal: string;
+}
+
+
+
+export function SupplierManager() {
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Proveedor | null>(null); 
+  const [selectedSupplier, setSelectedSupplier] = useState<Proveedor | null>(null); 
+  const [formData, setFormData] = useState<Partial<Proveedor>>({}); 
+  const [productFormData, setProductFormData] = useState<Partial<SuppliedProduct>>({});
+
+  const fetchProveedores = async () => {
+    try {
+        // 🚨 URL VERIFICADA: /api/v1/proveedores/ (en plural)
+        const response = await fetch(`${API_BASE_URL}/v1/proveedores/`, { 
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Error al cargar proveedores: ${response.statusText}`);
+        }
+
+        const responseData = await response.json();
+        
+        if (responseData.success && Array.isArray(responseData.data)) {
+            
+            const loadedProveedores = responseData.data.map((p: any) => ({
+                // 🚨 Mapeo del Backend (snake_case) al Frontend (camelCase) 🚨
+                
+                // Propiedades de la DB que coinciden:
+                id: p.id_proveedor,                    // id_proveedor -> id
+                companyName: p.nombre,                 // nombre -> companyName
+                contactName: p.nombre,                 // Usamos 'nombre' de nuevo, asumiendo que es el nombre de la empresa/contacto
+                email: p.email_contacto,               // email_contacto -> email
+                phone: p.numero_contacto,              // numero_contacto -> phone
+                city: p.direccion_fiscal.split(',')[0] || "N/A", // Parsea la dirección
+                state: p.direccion_fiscal.split(',').pop() || "N/A", // Parsea la dirección
+
+                // Propiedades de la DB que deben ser invertidas/traducidas:
+                isActive: !p.anulado,                  // !anulado -> isActive
+
+                // ⚠️ Propiedades Faltantes (usa valores por defecto para que no falle el JSX):
+                preferredSupplier: false,
+                category: "General",
+                rating: 0,
+                suppliedProducts: [], // Lista vacía, si no tienes el endpoint de productos
+                totalAmount: 0,
+                totalOrders: 0,
+                paymentTerms: "30 días",
+                
+            })); // Asignar el tipo de dato si es necesario
+
+            setProveedores(loadedProveedores); // Guarda la lista mapeada en 'proveedores'
+        }
+
+    } catch (error) {
+        console.error("Fallo la conexión con el Backend para proveedores:", error);
+        // Opcional: Mostrar un mensaje de error en el UI
+    }
+  };
+
+  const supplierCategories = [
+    'all',
+    'Ingredientes',
+    'Empaques',
+    'Servicios',
+    'Equipos',
+    // Agrega más categorías si es necesario
 ];
 
 const paymentTermsOptions = [
-  "Contado",
-  "15 días",
-  "30 días",
-  "45 días", 
-  "60 días",
-  "90 días"
+    { value: '7 días', label: '7 días (Pronto Pago)' },
+    { value: '15 días', label: '15 días' },
+    { value: '30 días', label: '30 días' },
+    { value: '45 días', label: '45 días (Estándar)' },
+    { value: '60 días', label: '60 días (Crédito Extendido)' },
 ];
 
-const mockSuppliers: Supplier[] = [
-  {
-    id: 1,
-    companyName: "Distribuidora San Miguel S.A.",
-    contactName: "Carlos Hernández",
-    email: "ventas@sanmiguel.com",
-    phone: "+1234567890",
-    alternatePhone: "+1234567891",
-    address: "Av. Industrial 1250",
-    city: "Ciudad de México",
-    state: "CDMX",
-    postalCode: "11000",
-    country: "México",
-    taxId: "DSM850123ABC",
-    website: "www.sanmiguel.com",
-    category: "Ingredientes Básicos",
-    rating: 4.5,
-    isActive: true,
-    preferredSupplier: true,
-    paymentTerms: "30 días",
-    deliveryZone: "Centro y Norte",
-    notes: "Proveedor confiable con excelente calidad en harinas y azúcares.",
-    registrationDate: "2023-01-15",
-    lastOrderDate: "2024-09-01",
-    totalOrders: 45,
-    totalAmount: 125000,
-    suppliedProducts: [
-      { id: 1, name: "Harina de Trigo Premium", category: "Harinas", unitPrice: 1.2, unit: "kg", quality: 5, deliveryTime: 2, minOrder: 50 },
-      { id: 2, name: "Azúcar Refinada", category: "Azúcares", unitPrice: 2.5, unit: "kg", quality: 4, deliveryTime: 2, minOrder: 25 },
-      { id: 3, name: "Sal Marina", category: "Condimentos", unitPrice: 0.8, unit: "kg", quality: 4, deliveryTime: 3, minOrder: 10 }
-    ]
-  },
-  {
-    id: 2,
-    companyName: "Lácteos Premium LTDA",
-    contactName: "María González",
-    email: "pedidos@lacteospremium.com",
-    phone: "+1234567892",
-    address: "Carrera 15 #45-67",
-    city: "Bogotá",
-    state: "Cundinamarca",
-    postalCode: "110111",
-    country: "Colombia",
-    taxId: "LPR901234567",
-    category: "Productos Lácteos",
-    rating: 4.8,
-    isActive: true,
-    preferredSupplier: true,
-    paymentTerms: "15 días",
-    deliveryZone: "Bogotá y alrededores",
-    notes: "Excelente calidad en productos lácteos, entrega puntual.",
-    registrationDate: "2023-03-20",
-    lastOrderDate: "2024-09-02",
-    totalOrders: 38,
-    totalAmount: 89500,
-    suppliedProducts: [
-      { id: 4, name: "Mantequilla Sin Sal", category: "Lácteos", unitPrice: 8.5, unit: "kg", quality: 5, deliveryTime: 1, minOrder: 5 },
-      { id: 5, name: "Leche Entera", category: "Lácteos", unitPrice: 1.8, unit: "litro", quality: 5, deliveryTime: 1, minOrder: 20 },
-      { id: 6, name: "Crema de Leche", category: "Lácteos", unitPrice: 4.2, unit: "litro", quality: 4, deliveryTime: 1, minOrder: 10 }
-    ]
-  },
-  {
-    id: 3,
-    companyName: "Empaques Modernos S.R.L.",
-    contactName: "José Martínez",
-    email: "info@empaquesmodernos.com",
-    phone: "+1234567893",
-    address: "Zona Industrial Km 12",
-    city: "Guadalajara",
-    state: "Jalisco",
-    postalCode: "44100",
-    country: "México",
-    taxId: "EMP789012345",
-    category: "Empaques y Envases",
-    rating: 3.8,
-    isActive: true,
-    preferredSupplier: false,
-    paymentTerms: "45 días",
-    deliveryZone: "Nacional",
-    notes: "Buenos precios en empaques, a veces hay retrasos en entrega.",
-    registrationDate: "2023-06-10",
-    lastOrderDate: "2024-08-25",
-    totalOrders: 22,
-    totalAmount: 35600,
-    suppliedProducts: [
-      { id: 7, name: "Cajas de Cartón 20x15x10", category: "Empaques", unitPrice: 0.45, unit: "unidad", quality: 4, deliveryTime: 5, minOrder: 100 },
-      { id: 8, name: "Bolsas Plásticas Transparentes", category: "Empaques", unitPrice: 0.12, unit: "unidad", quality: 3, deliveryTime: 7, minOrder: 500 }
-    ]
+ // Lógica de Filtrado Corregida
+const filteredSuppliers = proveedores.filter(proveedor => { // 🚨 suppliers -> proveedores
+  const matchesSearch = proveedor.companyName.toLowerCase().includes(searchTerm.toLowerCase()) || // 🚨 supplier -> proveedor
+                        proveedor.contactName.toLowerCase().includes(searchTerm.toLowerCase());  // 🚨 supplier -> proveedor
+  const matchesCategory = selectedCategory === "all" || proveedor.category === selectedCategory; // 🚨 supplier -> proveedor
+  return matchesSearch && matchesCategory;
+});
+
+const handleSubmit = (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (editingSupplier) {
+    setProveedores(prev => // 🚨 setSuppliers -> setProveedores
+      prev.map(proveedor => // 🚨 supplier -> proveedor
+        proveedor.id === editingSupplier.id 
+          ? { ...proveedor, ...formData } as Proveedor // 🚨 Supplier -> Proveedor
+          : proveedor
+      )
+    );
+  } else {
+    const newSupplier: Proveedor = { // 🚨 Supplier -> Proveedor
+      id: Math.max(...proveedores.map(s => s.id)) + 1, // 🚨 suppliers -> proveedores
+      ...formData,
+      isActive: true,
+      rating: 0,
+      totalOrders: 0,
+      totalAmount: 0,
+      lastOrderDate: '',
+      registrationDate: new Date().toISOString().split('T')[0],
+      suppliedProducts: []
+    } as Proveedor; // 🚨 Supplier -> Proveedor
+    setProveedores(prev => [...prev, newSupplier]); // 🚨 setSuppliers -> setProveedores
   }
-];
+  
+  setIsDialogOpen(false);
+  setEditingSupplier(null);
+  setFormData({});
+};
 
-export function SupplierManager() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  const [formData, setFormData] = useState<Partial<Supplier>>({});
-  const [productFormData, setProductFormData] = useState<Partial<SuppliedProduct>>({});
+const handleProductSubmit = (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (!selectedSupplier) return;
 
-  const filteredSuppliers = suppliers.filter(supplier => {
-    const matchesSearch = supplier.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         supplier.contactName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || supplier.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const newProduct: SuppliedProduct = {
+    id: Date.now(),
+    ...productFormData
+  } as SuppliedProduct;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (editingSupplier) {
-      setSuppliers(prev => 
-        prev.map(supplier => 
-          supplier.id === editingSupplier.id 
-            ? { ...supplier, ...formData } as Supplier
-            : supplier
-        )
-      );
-    } else {
-      const newSupplier: Supplier = {
-        id: Math.max(...suppliers.map(s => s.id)) + 1,
-        ...formData,
-        isActive: true,
-        rating: 0,
-        totalOrders: 0,
-        totalAmount: 0,
-        lastOrderDate: '',
-        registrationDate: new Date().toISOString().split('T')[0],
-        suppliedProducts: []
-      } as Supplier;
-      setSuppliers(prev => [...prev, newSupplier]);
-    }
-    
-    setIsDialogOpen(false);
-    setEditingSupplier(null);
-    setFormData({});
-  };
+  setProveedores(prev => // 🚨 setSuppliers -> setProveedores
+    prev.map(proveedor => // 🚨 supplier -> proveedor
+      proveedor.id === selectedSupplier.id
+        ? { ...proveedor, suppliedProducts: [...proveedor.suppliedProducts, newProduct] }
+        : proveedor
+    )
+  );
 
-  const handleProductSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedSupplier) return;
+  setIsProductDialogOpen(false);
+  setSelectedSupplier(null);
+  setProductFormData({});
+};
 
-    const newProduct: SuppliedProduct = {
-      id: Date.now(),
-      ...productFormData
-    } as SuppliedProduct;
+const toggleSupplierStatus = (id: number) => {
+  setProveedores(prev => // 🚨 setSuppliers -> setProveedores
+    prev.map(proveedor => // 🚨 supplier -> proveedor
+      proveedor.id === id ? { ...proveedor, isActive: !proveedor.isActive } : proveedor
+    )
+  );
+};
 
-    setSuppliers(prev =>
-      prev.map(supplier =>
-        supplier.id === selectedSupplier.id
-          ? { ...supplier, suppliedProducts: [...supplier.suppliedProducts, newProduct] }
-          : supplier
-      )
-    );
+const togglePreferredStatus = (id: number) => {
+  setProveedores(prev => // 🚨 setSuppliers -> setProveedores
+    prev.map(proveedor => // 🚨 supplier -> proveedor
+      proveedor.id === id ? { ...proveedor, preferredSupplier: !proveedor.preferredSupplier } : proveedor
+    )
+  );
+};
 
-    setIsProductDialogOpen(false);
-    setSelectedSupplier(null);
-    setProductFormData({});
-  };
+const handleEdit = (proveedor: Proveedor) => { // 🚨 supplier -> proveedor, Supplier -> Proveedor
+  setEditingSupplier(proveedor);
+  setFormData(proveedor);
+  setIsDialogOpen(true);
+};
 
-  const toggleSupplierStatus = (id: number) => {
-    setSuppliers(prev =>
-      prev.map(supplier =>
-        supplier.id === id ? { ...supplier, isActive: !supplier.isActive } : supplier
-      )
-    );
-  };
+const handleDelete = (id: number) => {
+  setProveedores(prev => prev.filter(proveedor => proveedor.id !== id)); // 🚨 setSuppliers -> setProveedores, supplier -> proveedor
+};
 
-  const togglePreferredStatus = (id: number) => {
-    setSuppliers(prev =>
-      prev.map(supplier =>
-        supplier.id === id ? { ...supplier, preferredSupplier: !supplier.preferredSupplier } : supplier
-      )
-    );
-  };
+const openAddDialog = () => {
+  setEditingSupplier(null);
+  setFormData({ country: "México", paymentTerms: "30 días" });
+  setIsDialogOpen(true);
+};
 
-  const handleEdit = (supplier: Supplier) => {
-    setEditingSupplier(supplier);
-    setFormData(supplier);
-    setIsDialogOpen(true);
-  };
+const openAddProductDialog = (supplier: Proveedor) => { // 🚨 Supplier -> Proveedor
+  setSelectedSupplier(supplier);
+  setProductFormData({});
+  setIsProductDialogOpen(true);
+};
 
-  const handleDelete = (id: number) => {
-    setSuppliers(prev => prev.filter(supplier => supplier.id !== id));
-  };
+const renderStars = (rating: number) => {
+  return Array.from({ length: 5 }, (_, i) => (
+    <Star
+      key={i}
+      className={`h-4 w-4 ${i < Math.floor(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+    />
+  ));
+};
 
-  const openAddDialog = () => {
-    setEditingSupplier(null);
-    setFormData({ country: "México", paymentTerms: "30 días" });
-    setIsDialogOpen(true);
-  };
+const getStatusBadge = (isActive: boolean) => {
+  return isActive ? (
+    <Badge className="bg-green-100 text-green-800">Activo</Badge>
+  ) : (
+    <Badge className="bg-red-100 text-red-800">Inactivo</Badge>
+  );
+};
 
-  const openAddProductDialog = (supplier: Supplier) => {
-    setSelectedSupplier(supplier);
-    setProductFormData({});
-    setIsProductDialogOpen(true);
-  };
+// Estadísticas Corregidas
+const stats = {
+  total: proveedores.length, // 🚨 suppliers -> proveedores
+  active: proveedores.filter(s => s.isActive).length, // 🚨 suppliers -> proveedores
+  preferred: proveedores.filter(s => s.preferredSupplier).length, // 🚨 suppliers -> proveedores
+  totalAmount: proveedores.reduce((sum, s) => sum + s.totalAmount, 0) // 🚨 suppliers -> proveedores
+};
 
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`h-4 w-4 ${i < Math.floor(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
-      />
-    ));
-  };
-
-  const getStatusBadge = (isActive: boolean) => {
-    return isActive ? (
-      <Badge className="bg-green-100 text-green-800">Activo</Badge>
-    ) : (
-      <Badge className="bg-red-100 text-red-800">Inactivo</Badge>
-    );
-  };
-
-  // Estadísticas
-  const stats = {
-    total: suppliers.length,
-    active: suppliers.filter(s => s.isActive).length,
-    preferred: suppliers.filter(s => s.preferredSupplier).length,
-    totalAmount: suppliers.reduce((sum, s) => sum + s.totalAmount, 0)
-  };
+  useEffect(() => {
+    fetchProveedores();
+  }, []);
 
   return (
     <div className="space-y-6">

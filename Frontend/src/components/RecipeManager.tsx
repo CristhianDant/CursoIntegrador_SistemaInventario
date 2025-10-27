@@ -1,15 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, Edit, Trash2, ChefHat, Clock, Users } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Textarea } from "./ui/textarea";
 import { Separator } from "./ui/separator";
+
+// Importación de la constante de la API (Asegúrate de que exista en tu archivo constants.ts)
+// Nota: Usamos una URL de ejemplo si no está disponible la constante
+const API_BASE_URL = "http://localhost:8000/api"; 
+
+
+// --- CONFIGURACIÓN DE URL UNIFICADA ---
+const RECETAS_API_URL = `${API_BASE_URL}/v1/recetas/`; 
+// --------------------------------------
 
 interface RecipeIngredient {
   id: number;
@@ -37,7 +45,6 @@ interface Recipe {
   sellingPrice: number;
 }
 
-// Mock data de insumos disponibles
 const availableIngredients = [
   { id: 1, name: "Harina de trigo", unit: "kg", currentStock: 25, costPerUnit: 1.2 },
   { id: 2, name: "Azúcar refinada", unit: "kg", currentStock: 15, costPerUnit: 2.5 },
@@ -49,54 +56,10 @@ const availableIngredients = [
   { id: 8, name: "Polvo de hornear", unit: "g", currentStock: 2000, costPerUnit: 0.01 },
 ];
 
-const mockRecipes: Recipe[] = [
-  {
-    id: 1,
-    name: "Pastel de Chocolate Clásico",
-    description: "Delicioso pastel de chocolate húmedo con glaseado",
-    category: "Pasteles",
-    preparationTime: 30,
-    cookingTime: 45,
-    servings: 8,
-    difficulty: 'Intermedio',
-    instructions: "1. Precalentar horno a 180°C...",
-    ingredients: [
-      { id: 1, ingredientId: 1, ingredientName: "Harina de trigo", quantity: 0.5, unit: "kg", cost: 0.6 },
-      { id: 2, ingredientId: 2, ingredientName: "Azúcar refinada", quantity: 0.3, unit: "kg", cost: 0.75 },
-      { id: 3, ingredientId: 3, ingredientName: "Huevos frescos", quantity: 4, unit: "unidades", cost: 1.32 },
-      { id: 4, ingredientId: 6, ingredientName: "Chocolate negro 70%", quantity: 0.2, unit: "kg", cost: 3.0 },
-    ],
-    totalCost: 5.67,
-    costPerServing: 0.71,
-    profit: 65,
-    sellingPrice: 12.0
-  },
-  {
-    id: 2,
-    name: "Galletas de Mantequilla",
-    description: "Clásicas galletas crujientes de mantequilla",
-    category: "Galletas",
-    preparationTime: 20,
-    cookingTime: 15,
-    servings: 24,
-    difficulty: 'Fácil',
-    instructions: "1. Batir mantequilla con azúcar...",
-    ingredients: [
-      { id: 1, ingredientId: 1, ingredientName: "Harina de trigo", quantity: 0.25, unit: "kg", cost: 0.3 },
-      { id: 2, ingredientId: 4, ingredientName: "Mantequilla", quantity: 0.15, unit: "kg", cost: 1.28 },
-      { id: 3, ingredientId: 2, ingredientName: "Azúcar refinada", quantity: 0.1, unit: "kg", cost: 0.25 },
-    ],
-    totalCost: 1.83,
-    costPerServing: 0.08,
-    profit: 200,
-    sellingPrice: 0.25
-  }
-];
-
 const categories = ["Pasteles", "Galletas", "Panes", "Postres", "Decoraciones"];
 
 export function RecipeManager() {
-  const [recipes, setRecipes] = useState<Recipe[]>(mockRecipes);
+  const [recipes, setRecipes] = useState<Recipe[]>([]); 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -105,16 +68,163 @@ export function RecipeManager() {
     ingredients: []
   });
 
+  // --- Funciones API ---
+
+  const fetchRecipes = async () => {
+    try {
+        const response = await fetch(RECETAS_API_URL, { 
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) {
+            throw new Error('Error al cargar las recetas');
+        }
+        
+        const result = await response.json();
+        const rawRecipes = result.data || result || [];
+
+        // ***** INICIO DE LA CORRECCIÓN DE MAPEO *****
+        const mappedRecipes: Recipe[] = rawRecipes.map((r: any) => {
+            // Asumiendo que el backend retorna:
+            // id_receta, nombre_receta, descripcion, tiempo_preparacion, etc.
+            
+            const totalCost = Number(r.costo_total || r.costo_estimado || 0);
+            const servings = Number(r.rendimiento_porciones || r.rendimiento_producto_terminado || 1);
+            const costPerServing = Number(r.costo_por_porcion) || (servings ? totalCost / servings : 0);
+            const sellingPrice = Number(r.precio_venta || r.sellingPrice || 0);
+            const profit = sellingPrice && costPerServing ? ((sellingPrice - costPerServing) / costPerServing) * 100 : 0;
+            
+            return {
+                // Mapeo de campos esenciales (Título y Descripción)
+                id: r.id_receta || r.id, 
+                name: r.nombre_receta || r.nombre || r.name || "Receta sin Título", // Usar r.nombre_receta o r.nombre
+                description: r.descripcion || r.description || "Receta sin Descripción", // Usar r.descripcion
+                
+                // Mapeo de campos de tiempo y cantidad
+                preparationTime: Number(r.tiempo_preparacion) || 0,
+                cookingTime: Number(r.tiempo_coccion) || 0,
+                servings: servings, 
+                
+                // Mapeo de otros campos
+                category: r.categoria || r.category || categories[0],
+                difficulty: r.dificultad || r.difficulty || 'Fácil',
+                instructions: r.instrucciones || r.instructions || '',
+                ingredients: r.ingredientes || r.ingredients || [],
+                
+                // Mapeo de costos calculados (para visualización)
+                totalCost: totalCost, 
+                costPerServing: costPerServing,
+                sellingPrice: sellingPrice,
+                profit: profit,
+            } as Recipe;
+        });
+        // ***** FIN DE LA CORRECCIÓN DE MAPEO *****
+        
+        setRecipes(mappedRecipes); 
+    } catch (error) {
+        console.error("Error fetching recipes:", error);
+    }
+  };
+
+  const createOrUpdateReceta = async (recipeData: Partial<Recipe>) => {
+      const isEditing = recipeData.id && recipeData.id !== 0;
+      const url = isEditing ? `${RECETAS_API_URL}${recipeData.id}` : RECETAS_API_URL;
+      const method = isEditing ? 'PUT' : 'POST';
+
+      const totalCost = calculateTotalCost();
+      const servings = recipeData.servings || 1;
+      const costPerServing = totalCost / servings;
+      const sellingPrice = recipeData.sellingPrice || 0;
+      const profit = sellingPrice ? ((sellingPrice - costPerServing) / costPerServing) * 100 : 0;
+
+      // Aquí deberías transformar los nombres de campo de vuelta 
+      // a la estructura que espera tu backend (ej: name -> nombre_receta)
+      const bodyData = {
+          // Si el backend espera nombre_receta y descripcion, envíalos así:
+          nombre_receta: recipeData.name, 
+          descripcion: recipeData.description,
+          
+          // Otros campos:
+          categoria: recipeData.category,
+          tiempo_preparacion: Number(recipeData.preparationTime) || 0,
+          tiempo_coccion: Number(recipeData.cookingTime) || 0,
+          rendimiento_porciones: servings, // o el nombre que use tu BD
+          precio_venta: sellingPrice,
+          dificultad: recipeData.difficulty,
+          instrucciones: recipeData.instructions,
+          
+          // La lista de ingredientes puede requerir mapeo también:
+          ingredientes: recipeData.ingredients?.map(ing => ({
+            id_insumo: ing.ingredientId, // asumiendo que tu BD usa 'id_insumo'
+            cantidad: ing.quantity,
+            // ... otros campos de ingrediente
+          })) 
+      }
+
+      try {
+          const response = await fetch(url, {
+              method: method,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(bodyData), 
+          });
+
+          if (!response.ok) {
+              const errorResult = await response.json();
+              throw new Error(errorResult.message || `Error al ${isEditing ? 'actualizar' : 'crear'} la receta.`);
+          }
+          
+          await fetchRecipes(); 
+          setIsDialogOpen(false);
+          setEditingRecipe(null);
+          setFormData({ ingredients: [] });
+      } catch (error) {
+          console.error(`Error during ${method} operation:`, error);
+          alert(`Operación fallida: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      }
+  }
+  
+  const handleDeleteAPI = async (id: number) => { 
+      try {
+          // Corregir la URL para asegurar que la barra (/) esté presente si es necesario
+          const response = await fetch(`${RECETAS_API_URL}${id}`, {
+              method: 'DELETE',
+          });
+          
+          if (!response.ok) {
+              const errorResult = await response.json();
+              throw new Error(errorResult.message || 'Error al eliminar la receta');
+          }
+
+          setRecipes(prev => prev.filter(r => r.id !== id));
+      } catch (error) {
+          console.error("Error deleting recipe:", error);
+          alert(`Eliminación fallida: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      }
+  }; 
+  
+  useEffect(() => {
+      fetchRecipes();
+  }, []);
+
+  // Filtrado de recetas (Corrección del TypeError incluida)
   const filteredRecipes = recipes.filter(recipe => {
-    const matchesSearch = recipe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         recipe.description.toLowerCase().includes(searchTerm.toLowerCase());
+    // Usamos el operador || "" para asegurar que siempre sea un string antes de toLowerCase()
+    const recipeName = recipe.name || "";
+    const recipeDescription = recipe.description || "";
+    
+    const matchesSearch = recipeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         recipeDescription.toLowerCase().includes(searchTerm.toLowerCase());
+                         
     const matchesCategory = selectedCategory === "all" || recipe.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
+  // ... (Resto de funciones: addIngredient, updateIngredient, removeIngredient, etc. no han cambiado)
+  
   const addIngredient = () => {
     const newIngredient: RecipeIngredient = {
-      id: Date.now(),
+      // Usar Date.now() + Math.random() para asegurar un ID único en el frontend
+      id: Date.now() + Math.random(), 
       ingredientId: 0,
       ingredientName: "",
       quantity: 0,
@@ -166,40 +276,9 @@ export function RecipeManager() {
     return (formData.ingredients || []).reduce((total, ing) => total + ing.cost, 0);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const totalCost = calculateTotalCost();
-    const costPerServing = totalCost / (formData.servings || 1);
-    
-    if (editingRecipe) {
-      setRecipes(prev => 
-        prev.map(recipe => 
-          recipe.id === editingRecipe.id 
-            ? { 
-                ...recipe, 
-                ...formData,
-                totalCost,
-                costPerServing,
-                profit: formData.sellingPrice ? ((formData.sellingPrice - costPerServing) / costPerServing) * 100 : 0
-              } as Recipe
-            : recipe
-        )
-      );
-    } else {
-      const newRecipe: Recipe = {
-        id: Math.max(...recipes.map(r => r.id)) + 1,
-        ...formData,
-        totalCost,
-        costPerServing,
-        profit: formData.sellingPrice ? ((formData.sellingPrice - costPerServing) / costPerServing) * 100 : 0
-      } as Recipe;
-      setRecipes(prev => [...prev, newRecipe]);
-    }
-    
-    setIsDialogOpen(false);
-    setEditingRecipe(null);
-    setFormData({ ingredients: [] });
+    await createOrUpdateReceta(formData);
   };
 
   const handleEdit = (recipe: Recipe) => {
@@ -209,12 +288,24 @@ export function RecipeManager() {
   };
 
   const handleDelete = (id: number) => {
-    setRecipes(prev => prev.filter(recipe => recipe.id !== id));
+    if (window.confirm("¿Está seguro que desea eliminar esta receta?")) {
+      handleDeleteAPI(id);
+    }
   };
 
   const openAddDialog = () => {
     setEditingRecipe(null);
-    setFormData({ ingredients: [] });
+    setFormData({ 
+      ingredients: [],
+      name: "",
+      description: "",
+      category: categories[0],
+      difficulty: 'Fácil',
+      preparationTime: 0,
+      cookingTime: 0,
+      servings: 1,
+      sellingPrice: 0,
+    });
     setIsDialogOpen(true);
   };
 
@@ -229,7 +320,7 @@ export function RecipeManager() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header y Dialog Trigger */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Gestión de Recetas</h2>
@@ -255,7 +346,7 @@ export function RecipeManager() {
             </DialogHeader>
             
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Información básica */}
+              {/* Información básica y detalles */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nombre de la Receta</Label>
@@ -272,7 +363,7 @@ export function RecipeManager() {
                   <Label htmlFor="category">Categoría</Label>
                   <Select 
                     value={formData.category || ""} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                    onValueChange={(value: string) => setFormData(prev => ({ ...prev, category: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecciona categoría" />
@@ -296,7 +387,6 @@ export function RecipeManager() {
                 />
               </div>
 
-              {/* Detalles de tiempo y dificultad */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="prepTime">Prep. (min)</Label>
@@ -332,7 +422,7 @@ export function RecipeManager() {
                   <Label htmlFor="difficulty">Dificultad</Label>
                   <Select 
                     value={formData.difficulty || ""} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, difficulty: value as Recipe['difficulty'] }))}
+                    onValueChange={(value: string) => setFormData(prev => ({ ...prev, difficulty: value as Recipe['difficulty'] }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Dificultad" />
@@ -348,7 +438,7 @@ export function RecipeManager() {
 
               <Separator />
 
-              {/* Ingredientes */}
+              {/* Ingredientes (Con key única garantizada) */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <Label className="text-base">Ingredientes</Label>
@@ -364,7 +454,7 @@ export function RecipeManager() {
                       <Label>Ingrediente</Label>
                       <Select 
                         value={ingredient.ingredientId?.toString() || ""} 
-                        onValueChange={(value) => updateIngredient(index, 'ingredientId', value)}
+                        onValueChange={(value: string) => updateIngredient(index, 'ingredientId', value)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar" />
@@ -422,18 +512,6 @@ export function RecipeManager() {
                     </div>
                   </div>
                 ))}
-
-                {(formData.ingredients || []).length > 0 && (
-                  <div className="flex justify-end">
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Costo Total de Ingredientes</p>
-                      <p className="text-lg font-semibold">${calculateTotalCost().toFixed(2)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Costo por porción: ${(calculateTotalCost() / (formData.servings || 1)).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
 
               <Separator />
@@ -464,7 +542,7 @@ export function RecipeManager() {
                 )}
               </div>
 
-              {/* Instrucciones */}
+              {/* Instrucciones y botones de acción */}
               <div className="space-y-2">
                 <Label htmlFor="instructions">Instrucciones de Preparación</Label>
                 <Textarea
@@ -520,74 +598,82 @@ export function RecipeManager() {
 
       {/* Lista de recetas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredRecipes.map((recipe) => (
-          <Card key={recipe.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <CardTitle className="text-lg">{recipe.name}</CardTitle>
-                  <CardDescription>{recipe.description}</CardDescription>
+        {recipes.length === 0 ? (
+            <p className="col-span-3 text-center text-muted-foreground">Cargando recetas o ninguna receta encontrada...</p>
+        ) : (
+            filteredRecipes.map((recipe, index) => (
+            <Card 
+                key={recipe.id || `recipe-${index}`} 
+                className="hover:shadow-lg transition-shadow"
+            >
+                <CardHeader>
+                <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                    {/* Aquí ahora se usan los campos mapeados: recipe.name y recipe.description */}
+                    <CardTitle className="text-lg">{recipe.name}</CardTitle>
+                    <CardDescription>{recipe.description}</CardDescription>
+                    </div>
+                    <Badge className={getDifficultyColor(recipe.difficulty)}>
+                    {recipe.difficulty}
+                    </Badge>
                 </div>
-                <Badge className={getDifficultyColor(recipe.difficulty)}>
-                  {recipe.difficulty}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <div className="flex items-center">
-                  <Clock className="h-4 w-4 mr-1" />
-                  {recipe.preparationTime + recipe.cookingTime} min
+                </CardHeader>
+                <CardContent className="space-y-4">
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <div className="flex items-center">
+                    <Clock className="h-4 w-4 mr-1" />
+                    {recipe.preparationTime + recipe.cookingTime} min
+                    </div>
+                    <div className="flex items-center">
+                    <Users className="h-4 w-4 mr-1" />
+                    {recipe.servings} porciones
+                    </div>
                 </div>
-                <div className="flex items-center">
-                  <Users className="h-4 w-4 mr-1" />
-                  {recipe.servings} porciones
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm">Costo total:</span>
-                  <span className="font-medium">${recipe.totalCost.toFixed(2)}</span>
+                <div className="space-y-2">
+                    <div className="flex justify-between">
+                    <span className="text-sm">Costo total:</span>
+                    <span className="font-medium">${(recipe.totalCost || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                    <span className="text-sm">Costo por porción:</span>
+                    <span className="font-medium">${(recipe.costPerServing || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                    <span className="text-sm">Precio de venta:</span>
+                    <span className="font-medium">${(recipe.sellingPrice || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                    <span className="text-sm">Margen:</span>
+                    <span className={`font-medium ${(recipe.profit || 0) > 50 ? 'text-green-600' : (recipe.profit || 0) > 20 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {(recipe.profit || 0).toFixed(1)}%
+                    </span>
+                    </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Costo por porción:</span>
-                  <span className="font-medium">${recipe.costPerServing.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Precio de venta:</span>
-                  <span className="font-medium">${recipe.sellingPrice.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Margen:</span>
-                  <span className={`font-medium ${recipe.profit > 50 ? 'text-green-600' : recipe.profit > 20 ? 'text-yellow-600' : 'text-red-600'}`}>
-                    {recipe.profit.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
 
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleEdit(recipe)}
-                  className="flex-1"
-                >
-                  <Edit className="h-3 w-3 mr-1" />
-                  Editar
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDelete(recipe.id)}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                <div className="flex space-x-2">
+                    <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEdit(recipe)}
+                    className="flex-1"
+                    >
+                    <Edit className="h-3 w-3 mr-1" />
+                    Editar
+                    </Button>
+                    <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDelete(recipe.id)}
+                    className="text-red-600 hover:text-red-700"
+                    >
+                    <Trash2 className="h-3 w-3" />
+                    </Button>
+                </div>
+                </CardContent>
+            </Card>
+            ))
+        )}
       </div>
     </div>
   );

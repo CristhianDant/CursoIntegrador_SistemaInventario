@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, Filter, Edit, Trash2, Package } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Textarea } from "./ui/textarea";
+import { API_BASE_URL } from "../constants";
 
 interface Ingredient {
   id: number;
@@ -24,102 +25,60 @@ interface Ingredient {
   notes?: string;
 }
 
-const mockIngredients: Ingredient[] = [
-  {
-    id: 1,
-    name: "Harina de trigo",
-    category: "Harinas",
-    currentStock: 25,
-    minStock: 10,
-    unit: "kg",
-    costPerUnit: 1.2,
-    supplier: "Molinos ABC",
-    expiryDate: "2024-12-15",
-    location: "Almacén A - Estante 1"
-  },
-  {
-    id: 2,
-    name: "Azúcar refinada",
-    category: "Endulzantes",
-    currentStock: 8,
-    minStock: 15,
-    unit: "kg",
-    costPerUnit: 2.5,
-    supplier: "Azucarera XYZ",
-    expiryDate: "2025-06-20",
-    location: "Almacén A - Estante 2"
-  },
-  {
-    id: 3,
-    name: "Huevos frescos",
-    category: "Proteínas",
-    currentStock: 18,
-    minStock: 20,
-    unit: "docenas",
-    costPerUnit: 4.0,
-    supplier: "Granja Los Robles",
-    expiryDate: "2024-09-06", // Por vencer en 3 días
-    location: "Refrigerador 1"
-  },
-  {
-    id: 4,
-    name: "Mantequilla sin sal",
-    category: "Lácteos",
-    currentStock: 5,
-    minStock: 8,
-    unit: "kg",
-    costPerUnit: 8.5,
-    supplier: "Lácteos Premium",
-    expiryDate: "2024-09-09", // Por vencer en 6 días
-    location: "Refrigerador 2"
-  },
-  {
-    id: 5,
-    name: "Chocolate negro 70%",
-    category: "Chocolates",
-    currentStock: 12,
-    minStock: 5,
-    unit: "kg",
-    costPerUnit: 15.0,
-    supplier: "Cacao Gourmet",
-    expiryDate: "2025-03-30",
-    location: "Almacén B - Estante 1"
-  },
-  {
-    id: 6,
-    name: "Leche entera",
-    category: "Lácteos",
-    currentStock: 15,
-    minStock: 10,
-    unit: "litros",
-    costPerUnit: 1.8,
-    supplier: "Lácteos Premium",
-    expiryDate: "2024-09-05", // Por vencer en 2 días (crítico)
-    location: "Refrigerador 1"
-  },
-  {
-    id: 7,
-    name: "Vainilla natural",
-    category: "Especias",
-    currentStock: 3,
-    minStock: 5,
-    unit: "ml",
-    costPerUnit: 0.5,
-    supplier: "Especias Gourmet",
-    expiryDate: "2025-01-15",
-    location: "Almacén A - Estante 3"
-  }
-];
+
 
 const categories = ["Harinas", "Endulzantes", "Proteínas", "Lácteos", "Chocolates", "Frutas", "Especias"];
 
 export function InventoryManager() {
-  const [ingredients, setIngredients] = useState<Ingredient[]>(mockIngredients);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(null);
   const [formData, setFormData] = useState<Partial<Ingredient>>({});
+
+  const fetchIngredients = async () => {
+    try {
+        // 🚨 CAMBIO CRÍTICO: De '/v1/insumo/' a '/v1/insumos/' (Asegúrate que API_BASE_URL no termine en '/')
+        const response = await fetch(`${API_BASE_URL}/v1/insumos/`, { 
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+            // Se actualiza el manejo de error para ser más informativo
+            const errorText = await response.text();
+            throw new Error(`Error al cargar insumos: ${response.statusText}. Respuesta del servidor: ${errorText}`);
+        }
+
+        const responseData = await response.json();
+        
+        if (responseData.success && Array.isArray(responseData.data)) {
+            
+            // EL MAPEO DE DATOS (sigue siendo el mismo, de snake_case a camelCase)
+            const loadedIngredients: Ingredient[] = responseData.data.map((p: any) => ({
+                id: p.id_insumo,                   
+                name: p.nombre,                     
+                currentStock: parseFloat(p.stock_actual || 0), 
+                minStock: parseFloat(p.stock_minimo || 0),   
+                unit: p.unidad_medida,              
+                costPerUnit: parseFloat(p.precio_promedio || 0), 
+                category: p.categoria || "N/A",     
+                notes: p.descripcion || "",       
+                supplier: "N/A (Cargar luego)",
+                location: "N/A (Cargar luego)",
+                expiryDate: "2999-12-31", 
+            })) as Ingredient[];
+            
+            setIngredients(loadedIngredients);
+        }
+
+    } catch (error) {
+        console.error("Fallo la conexión con el Backend:", error);
+    }
+};
+
+
 
   const filteredIngredients = ingredients.filter(ingredient => {
     const matchesSearch = ingredient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -178,6 +137,13 @@ export function InventoryManager() {
     setFormData({});
     setIsDialogOpen(true);
   };
+
+  
+  // 2. LLAMADA AL EFECTO
+  // Esto debe ir después de la definición de fetchIngredients
+  useEffect(() => {
+    fetchIngredients();
+  }, []);
 
   return (
     <div className="space-y-6">
