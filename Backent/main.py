@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from scalar_fastapi import get_scalar_api_reference , Layout
+
 from utils.logging_config import setup_logging
 from modules.empresa import router as empresa_router
 from modules.proveedores import router as proveedores_router
@@ -57,6 +59,20 @@ app.include_router(movimiento_productos_terminados_router.router, prefix="/api/v
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
+
+# ------------- Documentación con Scalar -------------
+@app.get("/<docs-scalar>", include_in_schema=False)
+async def scalar_docs():
+    return get_scalar_api_reference(
+        openapi_url=app.openapi_url,
+        title="Documentación!!!",
+        layout=Layout.MODERN,          # Diseño moderno
+        dark_mode=True,                # Tema oscuro activado
+        show_sidebar=True,             # Barra lateral con las rutas
+        default_open_all_tags=True,    # Abrir todos los grupos de rutas
+        hide_download_button=False,    # Permitir descargar el esquema
+        hide_models=False,             # Mostrar los modelos de datos
+    )
 
 if __name__ == "__main__":
     import uvicorn

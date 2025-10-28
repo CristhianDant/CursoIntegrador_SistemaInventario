@@ -4,6 +4,7 @@ import { LoginForm } from "./components/LoginForm";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./components/Dashboard";
 import { InventoryManager } from "./components/InventoryManager";
+import { InsumosManager } from "./components/InsumosManager";
 import { RecipeManager } from "./components/RecipeManager";
 import { ProductManager } from "./components/ProductManager";
 import { SupplierManager } from "./components/SupplierManager";
@@ -41,6 +42,8 @@ export default function App() {
         return <Dashboard />;
       case "inventory":
         return <InventoryManager />;
+      case "insumos":
+        return <InsumosManager />;
       case "recipes":
         return <RecipeManager />;
       case "products":

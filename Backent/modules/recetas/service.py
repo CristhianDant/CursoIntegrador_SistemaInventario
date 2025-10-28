@@ -2,6 +2,7 @@ from typing import List
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from modules.recetas.schemas import Receta, RecetaCreate, RecetaUpdate
+from modules.insumo.service import InsumoService
 from modules.recetas.repository import RecetaRepository
 from modules.recetas.service_interface import RecetaServiceInterface
 
@@ -19,6 +20,15 @@ class RecetaService(RecetaServiceInterface):
         return receta
 
     def create(self, db: Session, receta: RecetaCreate) -> Receta:
+        # Validar que insumos no esta
+        lista_insumos = receta.detalles
+        insumo_service = InsumoService(db)
+        for insumo in lista_insumos:
+            insumo_db = insumo_service.get_insumo(insumo.id_insumo)
+            if not insumo_db:
+                raise Exception(f"El insumo con id {insumo.id_insumo} no existe")
+
+
         return self.repository.create(db, receta)
 
     def update(self, db: Session, receta_id: int, receta: RecetaUpdate) -> Receta:
