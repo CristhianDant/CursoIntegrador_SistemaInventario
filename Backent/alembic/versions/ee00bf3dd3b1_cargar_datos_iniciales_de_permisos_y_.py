@@ -23,7 +23,7 @@ def upgrade() -> None:
     # Obtiene la ruta absoluta al directorio actual del script
     script_dir = os.path.dirname(os.path.abspath(__file__))
     # Construye la ruta al archivo data.sql (asumiendo que está en la raíz del proyecto)
-    sql_file_path = os.path.join(script_dir, '..', '..', 'data.sql')
+    sql_file_path = os.path.join(script_dir, '..', '..', 'querys', 'data.sql')
 
     with open(sql_file_path, 'r') as f:
         sql_commands = f.read().split(';')

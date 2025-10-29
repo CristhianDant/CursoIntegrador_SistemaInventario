@@ -10,7 +10,8 @@ import {
   X,
   ChefHat,
   User,
-  Building
+  Building,
+  Wrench
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "./ui/utils";
@@ -27,7 +28,12 @@ interface LayoutProps {
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
+<<<<<<< HEAD
   { id: 'inventory', label: 'Insumos', icon: Package },
+=======
+  { id: 'inventory', label: 'Inventario', icon: Package },
+  { id: 'insumos', label: 'Insumos', icon: Wrench },
+>>>>>>> 7d5ac6b43fefacc35fbbafafa5ad065e36129018
   { id: 'recipes', label: 'Recetas', icon: ChefHat },
   { id: 'products', label: 'Productos', icon: Package },
   { id: 'suppliers', label: 'Proveedores', icon: Building },

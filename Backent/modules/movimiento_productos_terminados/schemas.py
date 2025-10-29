@@ -26,3 +26,4 @@ class MovimientoProductoTerminado(MovimientoProductoTerminadoBase):
 
     class Config:
         from_attributes = True
+
