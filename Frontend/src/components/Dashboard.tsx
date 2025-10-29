@@ -1,32 +1,12 @@
-import { 
-  Package, 
-  AlertTriangle, 
-  TrendingDown, 
-  Calendar,
-  DollarSign,
-  PackageX,
-  ChefHat,
-  ShoppingCart,
-  Users,
-  Building
-} from "lucide-react";
+import { AlertTriangle, PackageX, TrendingDown } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 
-// Mock data para el dashboard
+// Datos mínimos necesarios para las secciones que el usuario quiere mantener
 const mockData = {
-  totalItems: 127,
-  lowStockItems: 8,
-  expiringItems: 5,
   monthlyWaste: 2.3,
-  totalValue: 15420,
-  totalRecipes: 45,
-  activeProducts: 28,
-  dailyProduction: 156,
-  totalUsers: 8,
-  totalSuppliers: 15,
   recentAlerts: [
     { id: 1, type: 'stock', item: 'Harina de trigo', level: 2, unit: 'kg' },
     { id: 2, type: 'expiry', item: 'Leche fresca', days: 2, unit: 'litros' },
@@ -45,144 +25,6 @@ const mockData = {
 export function Dashboard() {
   return (
     <div className="space-y-6">
-      {/* Métricas principales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-9 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total de Insumos
-            </CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{mockData.totalItems}</div>
-            <p className="text-xs text-muted-foreground">
-              Productos en inventario
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Stock Bajo
-            </CardTitle>
-            <AlertTriangle className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{mockData.lowStockItems}</div>
-            <p className="text-xs text-muted-foreground">
-              Necesitan reposición
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Por Vencer
-            </CardTitle>
-            <Calendar className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{mockData.expiringItems}</div>
-            <p className="text-xs text-muted-foreground">
-              Próximos a vencer
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Recetas
-            </CardTitle>
-            <ChefHat className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{mockData.totalRecipes}</div>
-            <p className="text-xs text-muted-foreground">
-              Recetas registradas
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Productos Activos
-            </CardTitle>
-            <ShoppingCart className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{mockData.activeProducts}</div>
-            <p className="text-xs text-muted-foreground">
-              Productos terminados
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Producción Hoy
-            </CardTitle>
-            <Package className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{mockData.dailyProduction}</div>
-            <p className="text-xs text-muted-foreground">
-              Unidades producidas
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Usuarios
-            </CardTitle>
-            <Users className="h-4 w-4 text-indigo-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{mockData.totalUsers}</div>
-            <p className="text-xs text-muted-foreground">
-              Usuarios del sistema
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Proveedores
-            </CardTitle>
-            <Building className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{mockData.totalSuppliers}</div>
-            <p className="text-xs text-muted-foreground">
-              Proveedores activos
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Valor Total
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${mockData.totalValue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              Valor del inventario
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Alertas recientes */}
         <Card>
