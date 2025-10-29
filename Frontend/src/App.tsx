@@ -43,8 +43,6 @@ export default function App() {
       case "inventory":
         return <InventoryManager />;
       case "insumos":
-        return <InsumosManager />;
-      case "recipes":
         return <RecipeManager />;
       case "products":
         return <ProductManager />;
