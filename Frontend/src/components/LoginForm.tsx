@@ -8,6 +8,7 @@ import { API_BASE_URL } from "../constants";
 // @ts-ignore: SVG module is handled by the bundler (svgr) and may not have TypeScript declarations
 import MiLogo from './Img/Pasteleria.svg?react';
 
+
 interface LoginFormProps {
   onLogin: (email: string) => void;
 }
@@ -52,13 +53,15 @@ export function LoginForm({ onLogin }: LoginFormProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50 p-6">
       <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="space-y-1 text-center">
+        <CardHeader className="text-center ">
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-orange-100 rounded-full">
-              <MiLogo className="h-8 w-8 text-orange-100" />
-            </div>
+           <div className="p-6 bg-orange-100 rounded-full h-32 w-32 flex items-center justify-center">
+            <div style={{ height: '120px', width: '120px' }}> 
+                <MiLogo className="h-full w-full text-orange-100" />
+            </div> 
+        </div>
           </div>
           <CardTitle className="text-2xl">Pastelería Dulce Encanto</CardTitle>
           <CardDescription>

@@ -302,12 +302,13 @@ useEffect(() => {
       batchNumber: selectedProduct.batchNumber
     };
 
+    const qty = movementData.quantity ?? 0;
     setProducts(prev =>
       prev.map(product => {
         if (product.id === selectedProduct.id) {
           const updatedStock = movementData.type === 'produccion' 
-            ? product.currentStock + movementData.quantity
-            : product.currentStock - movementData.quantity;
+            ? product.currentStock + qty
+            : product.currentStock - qty;
           
           const newStatus = updatedStock <= 0 ? 'Agotado' : 
                            updatedStock <= product.minStock ? 'Por Vencer' : 'Disponible';
@@ -683,7 +684,7 @@ useEffect(() => {
                 <Label htmlFor="recipeId">Receta Base</Label>
                 <Select 
                   value={formData.recipeId?.toString() || ""} 
-                  onValueChange={(value) => {
+                  onValueChange={(value: string) => {
                     const recipeId = parseInt(value);
                     const recipe = availableRecipes.find(r => r.id === recipeId);
                     setFormData(prev => ({ 

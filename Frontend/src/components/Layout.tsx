@@ -14,13 +14,8 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "./ui/utils";
+// @ts-ignore: SVG module is handled by the bundler (svgr) and may not have TypeScript declarations
 import MiLogo from './Img/Pasteleria.svg?react';
-
-declare module '*.svg?react' {
-  import React from 'react'
-  const content: React.FunctionComponent<React.SVGProps<SVGSVGElement>>
-  export default content
-}
 
 interface LayoutProps {
   children: ReactNode;
@@ -32,7 +27,7 @@ interface LayoutProps {
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
-  { id: 'inventory', label: 'Inventario', icon: Package },
+  { id: 'inventory', label: 'Insumos', icon: Package },
   { id: 'recipes', label: 'Recetas', icon: ChefHat },
   { id: 'products', label: 'Productos', icon: Package },
   { id: 'suppliers', label: 'Proveedores', icon: Building },
@@ -61,8 +56,7 @@ export function Layout({ children, currentPage, onPageChange, onLogout, username
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex items-center justify-between p-4 border-b">
-          <div className="flex items-center space-x-2">
-            <MiLogo className="h-8 w-8 text-orange-600" />
+          <div className="flex items-center space-x-2">            <MiLogo className="h-13 w-13 text-white" />
             <span className="text-xl font-semibold text-gray-900">Pastelería Dulce Encanto</span>
           </div>
           <Button

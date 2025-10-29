@@ -13,16 +13,20 @@ import { API_BASE_URL } from "../constants";
 
 interface Ingredient {
   id: number;
+  //Añadir 'code' (código es un VARCHAR en el modelo)
+  code: string; 
   name: string;
   category: string;
   currentStock: number;
   minStock: number;
   unit: string;
-  costPerUnit: number;
-  supplier: string;
-  expiryDate: string;
-  location: string;
+  costPerUnit: number; // Se mantiene, pero se omite en la UI
+  // supplier, isPerishable, location se manejan como opcionales
   notes?: string;
+  // Se añaden los campos opcionales para evitar errores si la lógica los usa:
+  supplier?: string; 
+  isPerishable?: boolean;
+  location?: string;
 }
 
 
@@ -37,9 +41,9 @@ export function InventoryManager() {
   const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(null);
   const [formData, setFormData] = useState<Partial<Ingredient>>({});
 
-  const fetchIngredients = async () => {
+const fetchIngredients = async () => {
     try {
-        // 🚨 CAMBIO CRÍTICO: De '/v1/insumo/' a '/v1/insumos/' (Asegúrate que API_BASE_URL no termine en '/')
+        //CAMBIO CRÍTICO: De '/v1/insumo/' a '/v1/insumos/' (Asegúrate que API_BASE_URL no termine en '/')
         const response = await fetch(`${API_BASE_URL}/v1/insumos/`, { 
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
@@ -53,90 +57,159 @@ export function InventoryManager() {
 
         const responseData = await response.json();
         
-        if (responseData.success && Array.isArray(responseData.data)) {
-            
-            // EL MAPEO DE DATOS (sigue siendo el mismo, de snake_case a camelCase)
-            const loadedIngredients: Ingredient[] = responseData.data.map((p: any) => ({
-                id: p.id_insumo,                   
-                name: p.nombre,                     
-                currentStock: parseFloat(p.stock_actual || 0), 
-                minStock: parseFloat(p.stock_minimo || 0),   
-                unit: p.unidad_medida,              
-                costPerUnit: parseFloat(p.precio_promedio || 0), 
-                category: p.categoria || "N/A",     
-                notes: p.descripcion || "",       
-                supplier: "N/A (Cargar luego)",
-                location: "N/A (Cargar luego)",
-                expiryDate: "2999-12-31", 
-            })) as Ingredient[];
+        const loadedIngredients: Ingredient[] = responseData.data.map((p: any) => ({
+        id: p.id_insumo,                   
+        name: p.nombre,                     
+        // USAR p.codigo para el campo 'code'
+        code: p.codigo, 
+        currentStock: parseFloat(p.stock_actual || 0), 
+        minStock: parseFloat(p.stock_minimo || 0),   
+        unit: p.unidad_medida,              
+        costPerUnit: parseFloat(p.precio_promedio || 0), 
+        category: p.categoria || "N/A",     
+        notes: p.descripcion || "", 
+        isPerishable: !!p.perecible,     
+    })) as Ingredient[];
             
             setIngredients(loadedIngredients);
-        }
-
     } catch (error) {
         console.error("Fallo la conexión con el Backend:", error);
     }
 };
 
+const handleDelete = async (id: number) => {
+    if (!window.confirm("¿Está seguro de que desea eliminar este insumo?")) return;
+    try {
+        // 🛑 RUTA DELETE /insumos/{id}
+        const response = await fetch(`${API_BASE_URL}/v1/insumos/${id}`, { 
+            method: 'DELETE',
+        });
+        
+        if (!response.ok) throw new Error('Error al eliminar');
+        
+        // Si la eliminación fue exitosa en el backend:
+        setIngredients(ingredients.filter(i => i.id !== id));
+        alert("Insumo eliminado exitosamente.");
+    } catch (error) {
+        console.error("Error al eliminar el insumo:", error);
+        alert("Error al eliminar el insumo.");
+    }
+};
 
+const handleEdit = (ingredient: Ingredient) => {
+    setEditingIngredient(ingredient); // Marca qué insumo estamos editando
+    setFormData(ingredient);          // Carga los datos en el formulario
+    setIsDialogOpen(true);            // Abre el modal
+};
+
+const openAddDialog = () => {
+    setEditingIngredient(null);
+    // Asegurarse de que el formulario se inicialice correctamente (ej. con un objeto vacío o valores por defecto)
+    setFormData({}); 
+    setIsDialogOpen(true);
+  };
+
+// --- Encargado de post y put ---
+
+// NOTA: Asegúrate de que tu interfaz Ingredient use 'id: number' o 'id_insumo: number'
+// Usaremos 'id' para esta corrección, ya que es el nombre de la interfaz inicial.
+
+const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const isEditing = !!editingIngredient;
+
+    // 1. Parseo seguro de stock_minimo ANTES de enviar
+    const minStockValue = formData.minStock 
+        ? parseFloat(formData.minStock as any) 
+        : 0; 
+
+    // 🛑 OBJETO dataToSend ESTRICTO:
+    const dataToSend = {
+        // CAMPOS OBLIGATORIOS
+        codigo: formData.code,
+        nombre: formData.name,
+        // FIX: Si está vacío, enviamos "" para que el backend lo fuerce
+        // a seleccionar un valor (ya que "" no es un valor de Enum válido).
+        unidad_medida: formData.unit || "", 
+        
+        // CAMPOS OPCIONALES
+        descripcion: formData.notes || null, 
+        stock_minimo: minStockValue, 
+        perecible: !!formData.isPerishable, 
+        categoria: formData.category || null, 
+    };
+
+    try {
+        let url = `${API_BASE_URL}/v1/insumos/`;
+        let method = 'POST';
+        
+        // 🔑 FIX CRÍTICO DEL PUT: Obtener el ID correctamente
+        let insumoId;
+        if (isEditing) {
+            // Asumimos que el ID está en la propiedad 'id' del objeto editingIngredient.
+            insumoId = (editingIngredient as Ingredient)?.id; 
+            
+            if (!insumoId) {
+                 throw new Error("ID de insumo faltante para la operación de actualización. Revisa el estado 'editingIngredient'.");
+            }
+            
+            url = `${API_BASE_URL}/v1/insumos/${insumoId}`;
+            method = 'PUT';
+        }
+
+        console.log(`[${method}] URL: ${url}`);
+        console.log("JSON de la solicitud:", JSON.stringify(dataToSend, null, 2));
+
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dataToSend), 
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.json();
+            console.error("Detalles del Error del Servidor (JSON de Pydantic):", errorBody);
+            
+            const errorMessage = errorBody.detail 
+                ? JSON.stringify(errorBody.detail, null, 2)
+                : response.statusText;
+            
+            throw new Error(`Fallo en la operación: ${response.statusText} - Detalles: ${errorMessage}`);
+        }
+        
+        // Lógica de éxito: Cierra el modal y recarga los datos
+        setIsDialogOpen(false);
+        // Si tienes una función loadIngredients() o similar, llámala aquí
+        // loadIngredients(); 
+        
+    } catch (error) {
+        console.error(`Error al ${isEditing ? 'actualizar' : 'crear'} el insumo:`, error);
+        alert(`Error al ${isEditing ? 'actualizar' : 'crear'} el insumo. Revisa la consola para detalles.`);
+    }
+};
 
   const filteredIngredients = ingredients.filter(ingredient => {
-    const matchesSearch = ingredient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ingredient.supplier.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = ingredient.name.toLowerCase().includes(searchTerm.toLowerCase()) 
     const matchesCategory = selectedCategory === "all" || ingredient.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   const getStockStatus = (ingredient: Ingredient) => {
-    const daysUntilExpiry = Math.ceil((new Date(ingredient.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
     
-    // Prioridad: 1. Stock bajo, 2. Por vencer (crítico), 3. Por vencer (advertencia)
-    if (ingredient.currentStock <= ingredient.minStock) return { label: "Stock Bajo", variant: "secondary" as const };
-    if (daysUntilExpiry <= 3 && daysUntilExpiry >= 0) return { label: "Por Vencer", variant: "destructive" as const };
-    if (daysUntilExpiry <= 7 && daysUntilExpiry >= 0) return { label: "Por Vencer", variant: "outline" as const };
-    if (daysUntilExpiry < 0) return { label: "Revisar Fecha", variant: "destructive" as const }; // Para fechas pasadas, pero sin usar "Vencido"
-    return { label: "Normal", variant: "default" as const };
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (editingIngredient) {
-      setIngredients(prev => 
-        prev.map(ingredient => 
-          ingredient.id === editingIngredient.id 
-            ? { ...ingredient, ...formData }
-            : ingredient
-        )
-      );
-    } else {
-      const newIngredient: Ingredient = {
-        id: Math.max(...ingredients.map(i => i.id)) + 1,
-        ...formData as Ingredient
-      };
-      setIngredients(prev => [...prev, newIngredient]);
+    // 1. Condición CRÍTICA (Stock Bajo/Agotado)
+    if (ingredient.currentStock <= ingredient.minStock) {
+        return { label: "Stock Bajo", variant: "destructive" as const }; 
     }
     
-    setIsDialogOpen(false);
-    setEditingIngredient(null);
-    setFormData({});
-  };
-
-  const handleEdit = (ingredient: Ingredient) => {
-    setEditingIngredient(ingredient);
-    setFormData(ingredient);
-    setIsDialogOpen(true);
-  };
-
-  const handleDelete = (id: number) => {
-    setIngredients(prev => prev.filter(ingredient => ingredient.id !== id));
-  };
-
-  const openAddDialog = () => {
-    setEditingIngredient(null);
-    setFormData({});
-    setIsDialogOpen(true);
-  };
+    // 2. Condición de ADVERTENCIA (Cerca del Mínimo)
+    // Definimos "Cerca del Mínimo" si el stock es <= 1.5 veces el stock mínimo
+    if (ingredient.currentStock <= ingredient.minStock * 1.5) {
+        return { label: "Cerca del Mínimo", variant: "warning" as const }; // Usamos 'warning' para amarillo/naranja
+    }
+    
+    // 3. Condición NORMAL
+    return { label: "Normal", variant: "default" as const };
+};
 
   
   // 2. LLAMADA AL EFECTO
@@ -145,12 +218,16 @@ export function InventoryManager() {
     fetchIngredients();
   }, []);
 
+  const isFormValid = formData.code?.trim() !== "" && 
+                      formData.name?.trim() !== "" && 
+                      formData.unit?.trim() !== "";
+
   return (
     <div className="space-y-6">
       {/* Header y controles */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Gestión de Inventario</h2>
+          <h2 className="text-2xl font-bold">Gestión de Insumos</h2>
           <p className="text-muted-foreground">Administra todos los insumos de tu pastelería</p>
         </div>
         
@@ -163,162 +240,142 @@ export function InventoryManager() {
           </DialogTrigger>
           
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingIngredient ? "Editar Insumo" : "Agregar Nuevo Insumo"}
-              </DialogTitle>
-              <DialogDescription>
-                {editingIngredient ? "Modifica la información del insumo" : "Completa los datos del nuevo insumo"}
-              </DialogDescription>
-            </DialogHeader>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nombre del Insumo</Label>
-                  <Input
-                    id="name"
-                    placeholder="Ej: Harina de trigo"
-                    value={formData.name || ""}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="category">Categoría</Label>
-                  <Select 
-                    value={formData.category || ""} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona categoría" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map(category => (
-                        <SelectItem key={category} value={category}>{category}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currentStock">Stock Actual</Label>
-                  <Input
-                    id="currentStock"
-                    type="number"
-                    placeholder="25"
-                    value={formData.currentStock || ""}
-                    onChange={(e) => setFormData(prev => ({ ...prev, currentStock: parseFloat(e.target.value) }))}
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="minStock">Stock Mínimo</Label>
-                  <Input
-                    id="minStock"
-                    type="number"
-                    placeholder="10"
-                    value={formData.minStock || ""}
-                    onChange={(e) => setFormData(prev => ({ ...prev, minStock: parseFloat(e.target.value) }))}
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="unit">Unidad</Label>
-                  <Select 
-                    value={formData.unit || ""} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, unit: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Unidad" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="kg">Kilogramos</SelectItem>
-                      <SelectItem value="g">Gramos</SelectItem>
-                      <SelectItem value="litros">Litros</SelectItem>
-                      <SelectItem value="ml">Mililitros</SelectItem>
-                      <SelectItem value="unidades">Unidades</SelectItem>
-                      <SelectItem value="docenas">Docenas</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="costPerUnit">Costo por Unidad</Label>
-                  <Input
-                    id="costPerUnit"
-                    type="number"
-                    step="0.01"
-                    placeholder="1.50"
-                    value={formData.costPerUnit || ""}
-                    onChange={(e) => setFormData(prev => ({ ...prev, costPerUnit: parseFloat(e.target.value) }))}
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="expiryDate">Fecha de Vencimiento</Label>
-                  <Input
-                    id="expiryDate"
-                    type="date"
-                    value={formData.expiryDate || ""}
-                    onChange={(e) => setFormData(prev => ({ ...prev, expiryDate: e.target.value }))}
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="supplier">Proveedor</Label>
-                  <Input
-                    id="supplier"
-                    placeholder="Molinos ABC"
-                    value={formData.supplier || ""}
-                    onChange={(e) => setFormData(prev => ({ ...prev, supplier: e.target.value }))}
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="location">Ubicación</Label>
-                  <Input
-                    id="location"
-                    placeholder="Almacén A - Estante 1"
-                    value={formData.location || ""}
-                    onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notas Adicionales</Label>
-                <Textarea
-                  id="notes"
-                  placeholder="Notas opcionales sobre el insumo..."
-                  value={formData.notes || ""}
-                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                />
-              </div>
-              
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit">
-                  {editingIngredient ? "Actualizar" : "Agregar"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
+  <DialogHeader>
+    <DialogTitle>
+      {editingIngredient ? "Editar Insumo" : "Agregar Nuevo Insumo"}
+    </DialogTitle>
+    <DialogDescription>
+      {editingIngredient ? "Modifica la información del insumo" : "Completa los datos del nuevo insumo"}
+    </DialogDescription>
+  </DialogHeader>
+
+  <form onSubmit={handleSubmit} className="space-y-4"> 
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Código (codigo) */}
+      <div className="space-y-2">
+        <Label htmlFor="code">Código del Insumo *</Label>
+        <Input
+          id="code"
+          placeholder="Ej: HRN001"
+          value={formData.code || ""} // FIX: Prevenir advertencia de React
+          onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
+          required
+        />
+      </div>
+
+      {/* Nombre (nombre) */}
+      <div className="space-y-2">
+        <Label htmlFor="name">Nombre del Insumo *</Label>
+        <Input
+          id="name"
+          placeholder="Ej: Harina de trigo"
+          value={formData.name || ""} // FIX: Prevenir advertencia de React
+          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+          required
+        />
+      </div>
+
+      {/* ✅ Categoría (categoria) */}
+      <div className="space-y-2">
+        <Label htmlFor="category">Categoría</Label>
+        <Select 
+          // FIX: Usar category y prevenir advertencia de React
+          value={formData.category || ""} 
+          onValueChange={(value) => setFormData({ ...formData, category: value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Selecciona categoría" />
+          </SelectTrigger>
+          <SelectContent>
+            {/* Asegúrate de que 'categories' es un array de strings */}
+            {categories.map(category => (
+              <SelectItem key={category} value={category}>{category}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* 🔑 Unidad (unidad_medida) */}
+      <div className="space-y-2">
+        <Label htmlFor="unit">Unidad *</Label>
+        <Select 
+          // FIX: Usar unit y prevenir advertencia de React
+          value={formData.unit || ""} 
+          onValueChange={(value) => setFormData({ ...formData, unit: value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Unidad" /> 
+          </SelectTrigger>
+          <SelectContent>
+            {/* Estos deben coincidir EXACTAMENTE con tu UnidadMedidaEnum de Python */}
+            <SelectItem value="KG">Kilogramos</SelectItem>
+            <SelectItem value="G">Gramos</SelectItem>
+            <SelectItem value="L">Litros</SelectItem>
+            <SelectItem value="ML">Mililitros</SelectItem>
+            <SelectItem value="UNIDAD">Unidades</SelectItem>
+            <SelectItem value="CAJA">Caja</SelectItem>
+            <SelectItem value="PAQUETE">Paquete</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Stock Mínimo (stock_minimo) */}
+      <div className="space-y-2">
+        <Label htmlFor="minStock">Stock Mínimo</Label>
+        <Input
+          id="minStock"
+          type="number"
+          step="0.01"
+          placeholder="10"
+          // FIX: Convertir a string vacío si es null/undefined para React
+          value={formData.minStock === null || formData.minStock === undefined ? "" : formData.minStock} 
+          // Guardar el valor tal como está en el input. El parseo ocurre en handleSubmit.
+          onChange={(e) => setFormData(prev => ({ ...prev, minStock: e.target.value }))}
+        />
+      </div>
+    </div>
+    
+    <div className="flex items-center space-x-4">
+      {/* Perecible (perecible) */}
+      <div className="flex items-center space-x-2 pt-2">
+        <Input 
+          id="isPerishable" 
+          type="checkbox" 
+          checked={formData.isPerishable || false} 
+          onChange={(e) => setFormData(prev => ({ ...prev, isPerishable: e.target.checked }))} 
+          className="w-4 h-4"
+        />
+        <Label htmlFor="isPerishable">Es Perecible</Label>
+      </div>
+    </div>
+
+    {/* Notas Adicionales (descripcion) */}
+    <div className="space-y-2">
+      <Label htmlFor="notes">Notas Adicionales</Label>
+      <Textarea
+        id="notes"
+        placeholder="Notas opcionales sobre el insumo..."
+        value={formData.notes || ""} // FIX: Prevenir advertencia de React
+        onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+      />
+    </div>
+
+    <div className="flex justify-end space-x-2 pt-4">
+      <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+        Cancelar
+      </Button>
+      <Button 
+          type="submit"
+          // FIX: Deshabilitar si faltan campos obligatorios, forzando la selección de unidad
+          disabled={!isFormValid} 
+      >
+        {editingIngredient ? "Actualizar" : "Agregar"}
+      </Button>
+    </div>
+  </form>
+</DialogContent>
         </Dialog>
       </div>
 
@@ -354,92 +411,91 @@ export function InventoryManager() {
 
       {/* Tabla de inventario */}
       <Card>
-        <CardHeader>
-          <CardTitle>Inventario Actual</CardTitle>
-          <CardDescription>
-            {filteredIngredients.length} insumos encontrados
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Insumo</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead>Stock</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Vencimiento</TableHead>
-                  <TableHead>Costo</TableHead>
-                  <TableHead>Proveedor</TableHead>
-                  <TableHead>Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredIngredients.map((ingredient) => {
-                  const status = getStockStatus(ingredient);
-                  const daysUntilExpiry = Math.ceil((new Date(ingredient.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-                  
-                  return (
-                    <TableRow key={ingredient.id}>
-                      <TableCell className="font-medium">{ingredient.name}</TableCell>
-                      <TableCell>{ingredient.category}</TableCell>
-                      <TableCell>
-                        {ingredient.currentStock} {ingredient.unit}
-                        <br />
-                        <span className="text-xs text-muted-foreground">
-                          Min: {ingredient.minStock} {ingredient.unit}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={status.variant}>{status.label}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(ingredient.expiryDate).toLocaleDateString()}
-                        <br />
-                        <span className={`text-xs ${
-                          daysUntilExpiry <= 3 && daysUntilExpiry >= 0 ? 'text-red-600' : 
-                          daysUntilExpiry <= 7 && daysUntilExpiry >= 0 ? 'text-orange-600' : 
-                          daysUntilExpiry < 0 ? 'text-red-800' : 'text-muted-foreground'
-                        }`}>
-                          {daysUntilExpiry >= 0 ? `${daysUntilExpiry} días restantes` : 'Fecha pasada - Revisar'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        ${ingredient.costPerUnit.toFixed(2)}
-                        <br />
-                        <span className="text-xs text-muted-foreground">
-                          Total: ${(ingredient.currentStock * ingredient.costPerUnit).toFixed(2)}
-                        </span>
-                      </TableCell>
-                      <TableCell>{ingredient.supplier}</TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(ingredient)}
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(ingredient.id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+  <CardHeader>
+    <CardTitle>Inventario Actual</CardTitle>
+    <CardDescription>
+      {filteredIngredients.length} insumos encontrados
+    </CardDescription>
+  </CardHeader>
+  <CardContent>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {/* 🛑 CABECERA: Usar 'Código' */}
+            <TableHead>Código</TableHead>
+            
+            <TableHead>Insumo</TableHead>
+            <TableHead>Categoría</TableHead>
+            <TableHead>Stock</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead>Perecible</TableHead>           
+            
+            <TableHead>Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredIngredients.map((ingredient) => {
+            const status = getStockStatus(ingredient); // Se mantiene la lógica de estado (por stock
+            
+            return (
+              <TableRow key={ingredient.id}>
+                
+                <TableCell className="font-medium">{ingredient.code}</TableCell>
+                
+                <TableCell className="font-medium">{ingredient.name}</TableCell>
+                <TableCell>{ingredient.category}</TableCell>
+                <TableCell>
+                  {ingredient.currentStock} {ingredient.unit}
+                  <br />
+                  <span className="text-xs text-muted-foreground">
+                    Min: {ingredient.minStock} {ingredient.unit}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={status.variant}>{status.label}</Badge>
+                </TableCell>
+
+                <TableCell>
+                  {/* 🛑 COMPROBACIÓN DIRECTA DEL VALOR BOOLEANO */}
+                  {ingredient.isPerishable ? (
+                      // Si es TRUE (perecible)
+                      <Badge variant="destructive">Sí</Badge> 
+                  ) : (
+                      // Si es FALSE (no perecible)
+                      <Badge variant="secondary">No</Badge>
+                  )}
+               </TableCell>
+                
+                {/* 🛑 ELIMINADAS: Celdas de Vencimiento, Costo y Proveedor */}
+                
+                <TableCell>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(ingredient)}
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(ingredient.id)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  </CardContent>
+</Card>
     </div>
   );
 }
