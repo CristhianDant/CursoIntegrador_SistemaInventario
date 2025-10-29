@@ -21,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Upgrade schema."""
     # Get the directory of the current script
-    sql_file_path = os.path.join(os.path.dirname(__file__), '../../shemas.sql')
+    sql_file_path = os.path.join(os.path.dirname(__file__), '../../querys/shemas.sql')
     with open(sql_file_path) as f:
         op.execute(f.read())
 
