@@ -11,7 +11,8 @@ import {
   ChefHat,
   User,
   Building,
-  Wrench
+  Wrench,
+  Truck
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "./ui/utils";
@@ -30,6 +31,8 @@ const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
   { id: 'inventory', label: 'Insumos', icon: Package },
   { id: 'recipes', label: 'Recetas', icon: ChefHat },
+  { id: 'purchase-orders', label: 'Órdenes de Compra', icon: Wrench },
+  { id: 'supply-entry', label: 'Ingreso de Insumos', icon: Truck },
   { id: 'products', label: 'Productos', icon: Package },
   { id: 'suppliers', label: 'Proveedores', icon: Building },
   { id: 'users', label: 'Usuarios', icon: User },

@@ -3,7 +3,7 @@ import { LoginForm } from "./components/LoginForm";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./components/Dashboard";
 import { InventoryManager } from "./components/InventoryManager";
-
+import { PurchaseOrderManager } from "./components/PurchaseOrderManager";
 import { RecipeManager } from "./components/RecipeManager";
 import { ProductManager } from "./components/ProductManager";
 import { SupplierManager } from "./components/SupplierManager";
@@ -11,6 +11,7 @@ import { UserManager } from "./components/UserManager";
 import { AlertsManager } from "./components/AlertsManager";
 import { ReportsManager } from "./components/ReportsManager";
 import { SettingsManager } from "./components/SettingsManager";
+import { SupplyEntryManager } from "./components/SupplyEntryManager";
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -43,6 +44,10 @@ export default function App() {
         return <InventoryManager />;
       case "recipes":
         return <RecipeManager />;
+      case "purchase-orders":
+        return <PurchaseOrderManager />;
+      case "supply-entry":
+        return <SupplyEntryManager />;
       case "products":
         return <ProductManager />;
       case "suppliers":

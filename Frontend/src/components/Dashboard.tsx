@@ -1,4 +1,4 @@
-import { AlertTriangle, PackageX, TrendingDown } from "lucide-react";
+import { AlertTriangle, PackageX, TrendingDown, ShoppingCart } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Badge } from "./ui/badge";
@@ -7,6 +7,7 @@ import { Progress } from "./ui/progress";
 // Datos mínimos necesarios para las secciones que el usuario quiere mantener
 const mockData = {
   monthlyWaste: 2.3,
+  pendingOrders: 5, // Nuevo dato
   recentAlerts: [
     { id: 1, type: 'stock', item: 'Harina de trigo', level: 2, unit: 'kg' },
     { id: 2, type: 'expiry', item: 'Leche fresca', days: 2, unit: 'litros' },
@@ -25,6 +26,53 @@ const mockData = {
 export function Dashboard() {
   return (
     <div className="space-y-6">
+       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Órdenes de Compra Pendientes */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Órdenes Pendientes
+            </CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{mockData.pendingOrders}</div>
+            <p className="text-xs text-muted-foreground">
+              Órdenes de compra esperando aprobación o entrega.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Merma del Mes */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Merma del Mes</CardTitle>
+            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{mockData.monthlyWaste}%</div>
+            <p className="text-xs text-muted-foreground">
+              Respecto al total de insumos del mes anterior.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Insumos Agotándose */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Insumos Agotándose</CardTitle>
+            <PackageX className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {mockData.recentAlerts.filter(a => a.type === 'stock').length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Insumos con niveles de stock bajos.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Alertas recientes */}
         <Card>
@@ -90,38 +138,6 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Resumen de merma */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Resumen de Merma - Este Mes</CardTitle>
-          <CardDescription>
-            Análisis de productos perdidos por vencimiento
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-red-100 rounded-full">
-              <PackageX className="h-6 w-6 text-red-600" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-red-600">
-                ${mockData.monthlyWaste.toFixed(1)}K
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Pérdidas por vencimiento este mes
-              </p>
-            </div>
-            <div className="ml-auto text-right">
-              <div className="flex items-center text-green-600">
-                <TrendingDown className="h-4 w-4 mr-1" />
-                <span className="text-sm font-medium">-15%</span>
-              </div>
-              <p className="text-xs text-muted-foreground">vs. mes anterior</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
