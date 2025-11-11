@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from database import Base
+from datetime import datetime
 from typing import List
 from database import get_db
 from modules.orden_de_compra.schemas import OrdenDeCompra, OrdenDeCompraCreate, OrdenDeCompraUpdate

@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { API_BASE_URL } from '../constants';
 
 // --- CONFIGURACIÓN DE URL UNIFICADA ---
-const ORDEN_COMPRA_API_URL = `${API_BASE_URL}/v1/ordenes-compra`;
+const ORDEN_COMPRA_API_URL = `${API_BASE_URL}/v1/ordenes_compra`;
 
 // *** INTERFACES AJUSTADAS AL MODELO DE LA API ***
 
@@ -290,8 +290,80 @@ export function PurchaseOrderManager() {
                 {editingOrder ? "Modifica los detalles de la orden." : "Crea una nueva orden para un proveedor."}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Encabezado de la orden */}
+            {/* Encabezado de la orden */}
+            <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="numero_orden">Número de Orden</Label>
+                <Input
+                  id="numero_orden"
+                  value={formData.numero_orden || ""}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, numero_orden: e.target.value }))}
+                  disabled={!!editingOrder}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="fecha_orden">Fecha de Orden</Label>
+                <Input
+                  id="fecha_orden"
+                  type="date"
+                  value={formData.fecha_orden || ""}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, fecha_orden: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="estado">Estado</Label>
+                <Select
+                  value={String(formData.estado || 'PENDIENTE')}
+                  onValueChange={(value: string) => setFormData(prev => ({ ...prev, estado: value as OrdenDeCompra['estado'] }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PENDIENTE">PENDIENTE</SelectItem>
+                    <SelectItem value="APROBADO">APROBADO</SelectItem>
+                    <SelectItem value="RECHAZADO">RECHAZADO</SelectItem>
+                    <SelectItem value="COMPLETADO">COMPLETADO</SelectItem>
+                    <SelectItem value="CANCELADO">CANCELADO</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="moneda_header">Moneda / Tipo de cambio</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={formData.moneda || 'PEN'}
+                    onValueChange={(value: string) => setFormData(prev => ({ ...prev, moneda: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PEN">PEN</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {formData.moneda === 'USD' && (
+                    <Input
+                      id="tipo_cambio"
+                      type="number"
+                      step="0.0001"
+                      placeholder="Tipo cambio"
+                      value={String(formData.tipo_cambio ?? '')}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, tipo_cambio: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* campo oculto / meta del usuario creador */}
+              <input type="hidden" name="id_user_creador" value={String(formData.id_user_creador || 1)} />
+            </div> {/* Encabezado de la orden */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="numero_orden">Número de Orden</Label>

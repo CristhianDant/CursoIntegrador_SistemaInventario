@@ -12,17 +12,24 @@ import { AlertsManager } from "./components/AlertsManager";
 import { ReportsManager } from "./components/ReportsManager";
 import { SettingsManager } from "./components/SettingsManager";
 import { SupplyEntryManager } from "./components/SupplyEntryManager";
+import { TypewriterSplash } from './components/TypewriterSplash';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState("");
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [showLanding, setShowLanding] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   const handleLogin = (email: string) => {
     setCurrentUser(email);
     setIsLoggedIn(true);
     setShowLanding(false);
+  };
+
+  const handleSplashEnd = () => {
+    // Cuando la animación de TypewriterSplash termina, ocultamos el splash
+    setShowSplash(false);
   };
 
   const handleGetStarted = () => {
@@ -34,6 +41,7 @@ export default function App() {
     setCurrentUser("");
     setCurrentPage("dashboard");
     setShowLanding(true);
+    setShowSplash(true);
   };
 
   const renderCurrentPage = () => {
@@ -64,6 +72,10 @@ export default function App() {
         return <Dashboard />;
     }
   };
+
+  if (showSplash) {
+    return <TypewriterSplash onAnimationEnd={handleSplashEnd} />;
+  }
 
   if (showLanding) {
     return <LoginForm onLogin={handleGetStarted} />;

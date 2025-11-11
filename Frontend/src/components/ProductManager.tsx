@@ -35,24 +35,55 @@ interface PromotionSuggestion {
 }
 
 interface FinishedProduct {
-  id: number;
-  name: string;
-  recipeId: number;
-  recipeName: string;
-  category: string;
-  currentStock: number;
-  minStock: number;
-  maxStock: number;
-  unitCost: number;
-  sellingPrice: number;
-  profitMargin: number;
-  expiryDate: string;
-  productionDate: string;
-  batchNumber: string;
-  barcode?: string;
-  description: string;
-  status: 'Disponible' | 'Agotado' | 'Por Vencer';
-  movements: ProductMovement[];
+    id_producto: number; // FIX: Era 'id', debe ser 'id_producto'
+    codigo_producto: string;
+    nombre: string;
+    descripcion: string;
+    unidad_medida: string;
+    stock_actual: number; // FIX: Era 'currentStock', debe ser 'stock_actual'
+    stock_minimo: number; // FIX: Era 'minStock', debe ser 'stock_minimo'
+    precio_venta: number;
+    vida_util_dias: number | null;
+    fecha_registro: string;
+    anulado: boolean;
+
+    // Campos de relleno/temporales de la UI (Mantenidos para evitar errores en otras partes)
+    recipeId: number;
+    recipeName: string;
+    category: string;
+    unitCost: number;
+    profitMargin: number;
+    expiryDate: string;
+    productionDate: string;
+    maxStock: number;
+    status: 'Disponible' | 'Agotado' | 'Por Vencer';
+    movements: ProductMovement[];
+}
+
+// En C:/Users/Asus/OneDrive/Documentos/repo_Integrador/.../ProductManager.tsx
+
+interface FormData {
+    // Usamos 'id' en el Formulario, pero mapea a 'id_producto' en la API
+    id?: number; 
+    
+    // Usamos camelCase para los campos de formulario:
+    productCode?: string; // Mapea a codigo_producto
+    name: string; // Mapea a nombre
+    description: string; // Mapea a descripcion
+    unitOfMeasure: string; // Mapea a unidad_medida
+    minStock: number; // Mapea a stock_minimo
+    sellingPrice: number; // Mapea a precio_venta
+    shelfLifeDays: number | null; // Mapea a vida_util_dias
+    
+    // Campos del formulario/UI
+    unitCost?: number;
+    maxStock?: number;
+    recipeId?: number | null;
+    currentStock?: number; // Aunque solo para visualización, lo definimos
+    anulado?: boolean;
+    category?: string;
+    productionDate?: string;
+    expiryDate?: string;
 }
 
 // Mock data de recetas disponibles
@@ -156,7 +187,7 @@ export function ProductManager() {
   const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<FinishedProduct | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<FinishedProduct | null>(null);
-  const [formData, setFormData] = useState<Partial<FinishedProduct>>({});
+  const [formData, setFormData] = useState<Partial<FormData>>({});
   const [movementData, setMovementData] = useState<Partial<ProductMovement>>({});
   const [promotionSuggestions, setPromotionSuggestions] = useState<PromotionSuggestion[]>([]);
   const [selectedPromotion, setSelectedPromotion] = useState<PromotionSuggestion | null>(null);
@@ -182,25 +213,29 @@ export function ProductManager() {
             
             // ESTE ES EL MAPEO CRÍTICO DE NOMBRES
             const loadedProducts: FinishedProduct[] = data.data.map((p: any) => ({
-                // Mapeo de DB (snake_case) a React (camelCase)
-                id: p.id_producto,               
-                name: p.nombre,                   
-                currentStock: parseFloat(p.stock_actual || 0),
-                minStock: parseFloat(p.stock_minimo || 0),   
-                sellingPrice: parseFloat(p.precio_venta || 0),
-                description: p.descripcion || "",
-                
+                // Mapeo de DB (snake_case) a React (snake_case)
+                id_producto: p.id_producto,               
+                codigo_producto: p.codigo_producto, // Nuevo campo
+                nombre: p.nombre,                   
+                descripcion: p.descripcion || "",
+                unidad_medida: p.unidad_medida, // ¡CRÍTICO! Usar el campo real de la DB
+                stock_actual: parseFloat(p.stock_actual || 0),
+                stock_minimo: parseFloat(p.stock_minimo || 0),   
+                precio_venta: parseFloat(p.precio_venta || 0),
+                vida_util_dias: p.vida_util_dias,
+                fecha_registro: p.fecha_registro,
+                anulado: p.anulado,
+
                 // Valores de relleno necesarios para que la interfaz NO falle
-                recipeName: p.nombre_receta || "N/A",  // Si tienes este campo en tu API, úsalo
+                recipeName: p.nombre_receta || "N/A",  
                 category: p.categoria || "Sin Categoría",
-                unitCost: parseFloat(p.costo_unitario || 0), // Si lo agregaste en la DB
-                profitMargin: 0.00, // Debe ser calculado: (sellingPrice - unitCost) / unitCost
+                unitCost: parseFloat(p.costo_unitario || 0),
+                profitMargin: 0.00, // Calcular con datos reales
                 expiryDate: p.fecha_vencimiento || new Date().toISOString().split('T')[0],
-                productionDate: p.fecha_produccion || new Date().toISOString().split('T')[0],
-                batchNumber: p.codigo_producto || "N/A",
-                status: 'Disponible', // O una función para calcular el estado
-                maxStock: 20,
-                recipeId: 0,
+                productionDate: new Date(p.fecha_registro).toISOString().split('T')[0], // Usar fecha_registro
+                maxStock: 20, // Valor hardcodeado temporal
+                recipeId: 0, // Valor hardcodeado temporal
+                status: 'Disponible', // Debe ser calculado con stock_actual y stock_minimo
                 movements: [],
             })) as FinishedProduct[];
             
@@ -248,104 +283,128 @@ useEffect(() => {
     return `${prefix}${dateStr}${sequence}`;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+ const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const selectedRecipe = availableRecipes.find(r => r.id === formData.recipeId);
-    const batchNumber = formData.batchNumber || generateBatchNumber(formData.recipeId || 0);
+    // Variables de control
+    const idToUpdate = editingProduct?.id_producto; 
     
-    if (editingProduct) {
-      setProducts(prev => 
-        prev.map(product => 
-          product.id === editingProduct.id 
-            ? { 
-                ...product, 
-                ...formData,
-                recipeName: selectedRecipe?.name || product.recipeName,
-                profitMargin: formData.sellingPrice && formData.unitCost ? 
-                  ((formData.sellingPrice - formData.unitCost) / formData.unitCost) * 100 : 
-                  product.profitMargin
-              } as FinishedProduct
-            : product
-        )
-      );
-    } else {
-      const newProduct: FinishedProduct = {
-        id: Math.max(...products.map(p => p.id)) + 1,
-        ...formData,
-        recipeName: selectedRecipe?.name || "",
-        batchNumber,
-        status: 'Disponible',
-        movements: [],
-        profitMargin: formData.sellingPrice && formData.unitCost ? 
-          ((formData.sellingPrice - formData.unitCost) / formData.unitCost) * 100 : 0
-      } as FinishedProduct;
-      setProducts(prev => [...prev, newProduct]);
+    if (editingProduct && idToUpdate) { // Lógica de Edición (PUT)
+        
+        // Mapeo: formData (UI/camelCase) -> updatedData (API/snake_case)
+        const updatedData = {
+            // Usamos '!' para indicar que estos campos deben existir al enviar el formulario.
+            nombre: formData.name!, 
+            descripcion: formData.description || "",
+            unidad_medida: formData.unitOfMeasure || editingProduct.unidad_medida, 
+            stock_minimo: formData.minStock!,
+            // Usamos '?? null' para enviar None a Python si el campo está vacío.
+            vida_util_dias: formData.vida_util_dias ?? null, 
+            precio_venta: formData.sellingPrice!,
+            anulado: formData.anulado ?? false, 
+        };
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/v1/productos_terminados/${idToUpdate}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedData), 
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Error al actualizar el producto.');
+            }
+
+            await response.json(); 
+            fetchProducts(); 
+
+        } catch (error) {
+            console.error("Fallo la actualización del producto. El error es:", error);
+        }
+        
+    } else { // Lógica de Creación (POST)
+        
+        // Mapeo: formData (UI/camelCase) -> newProductData (API/snake_case)
+        const newProductData = {
+            // Usamos el código del form, o generamos uno si es nulo.
+            codigo_producto: formData.codigo_producto || generateBatchNumber(formData.recipeId || 0),
+            // Usamos '!' para indicar que estos campos deben existir al enviar el formulario.
+            nombre: formData.name!, 
+            descripcion: formData.description || "",
+            unidad_medida: formData.unitOfMeasure || "UNIDAD", 
+            stock_minimo: formData.minStock!,
+            vida_util_dias: formData.vida_util_dias ?? 30, 
+            precio_venta: formData.sellingPrice!,
+            // stock_actual y fecha_registro no se envían.
+        };
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/v1/productos_terminados/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newProductData),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Error al crear el producto.');
+            }
+
+            await response.json();
+            fetchProducts(); 
+
+        } catch (error) {
+            console.error("Fallo la creación del producto. El error es:", error);
+        }
     }
     
+    // Limpieza y cierre
     setIsDialogOpen(false);
     setEditingProduct(null);
-    setFormData({});
-  };
+    setFormData({}); 
+};
 
-  const handleMovementSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedProduct || !movementData.type || !movementData.quantity) return;
+// --- Funciones Auxiliares (sin cambios, asumiendo que los setters existen) ---
 
-    const newMovement: ProductMovement = {
-      id: Date.now(),
-      type: movementData.type,
-      quantity: movementData.quantity,
-      date: movementData.date || new Date().toISOString().split('T')[0],
-      notes: movementData.notes,
-      batchNumber: selectedProduct.batchNumber
-    };
-
-    const qty = movementData.quantity ?? 0;
-    setProducts(prev =>
-      prev.map(product => {
-        if (product.id === selectedProduct.id) {
-          const updatedStock = movementData.type === 'produccion' 
-            ? product.currentStock + qty
-            : product.currentStock - qty;
-          
-          const newStatus = updatedStock <= 0 ? 'Agotado' : 
-                           updatedStock <= product.minStock ? 'Por Vencer' : 'Disponible';
-
-          return {
-            ...product,
-            currentStock: Math.max(0, updatedStock),
-            status: newStatus,
-            movements: [...product.movements, newMovement]
-          };
-        }
-        return product;
-      })
-    );
-
-    setIsMovementDialogOpen(false);
-    setSelectedProduct(null);
-    setMovementData({});
-  };
-
-  const openProductionDialog = (product: FinishedProduct) => {
+const openProductionDialog = (product: FinishedProduct) => {
+    // Asumo que setSelectedProduct, setMovementData e setIsMovementDialogOpen están definidos
     setSelectedProduct(product);
     setMovementData({ type: 'produccion', date: new Date().toISOString().split('T')[0] });
     setIsMovementDialogOpen(true);
-  };
+};
 
-  const openSaleDialog = (product: FinishedProduct) => {
+const openSaleDialog = (product: FinishedProduct) => {
+    // Asumo que setSelectedProduct, setMovementData e setIsMovementDialogOpen están definidos
     setSelectedProduct(product);
     setMovementData({ type: 'venta', date: new Date().toISOString().split('T')[0] });
     setIsMovementDialogOpen(true);
-  };
+};
 
-  const handleEdit = (product: FinishedProduct) => {
-    setEditingProduct(product);
-    setFormData(product);
-    setIsDialogOpen(true);
-  };
+const handleEdit = (product: FinishedProduct) => {
+  setEditingProduct(product);
+  
+  // *** Mapeo CRÍTICO: Backend (snake_case) a UI (camelCase/form) ***
+  setFormData({
+    // Propiedades API/DB (product.)     = Propiedades Formulario (setFormData)
+    id_producto: product.id_producto,
+    codigo_producto: product.codigo_producto,
+    name: product.nombre, // FIX: Usa product.nombre
+    description: product.descripcion, // FIX: Usa product.descripcion
+    currentStock: product.stock_actual, // FIX: Usa product.stock_actual
+    minStock: product.stock_minimo, // FIX: Usa product.stock_minimo
+    sellingPrice: product.precio_venta, // FIX: Usa product.precio_venta
+    unitOfMeasure: product.unidad_medida, // FIX: Usa product.unidad_medida
+    vida_util_dias: product.vida_util_dias, 
+    anulado: product.anulado, 
+
+    // Campos de la UI que no vienen directamente de la API (Mantener en camelCase)
+    unitCost: product.unitCost, 
+    maxStock: product.maxStock, 
+    recipeId: product.recipeId, 
+  });
+  setIsDialogOpen(true);
+};
 
   const handleDelete = (id: number) => {
     setProducts(prev => prev.filter(product => product.id !== id));
@@ -571,11 +630,11 @@ useEffect(() => {
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
+                  <TableRow key={product.id_producto}> {/* CORRECCIÓN: product.id -> product.id_producto */}
                     <TableCell>
                       <div>
-                        <div className="font-medium">{product.name}</div>
-                        <div className="text-sm text-muted-foreground">{product.batchNumber}</div>
+                        <div className="font-medium">{product.nombre}</div> {/* CORRECCIÓN: product.name -> product.nombre */}
+                        <div className="text-sm text-muted-foreground">{product.codigo_producto}</div> {/* CORRECCIÓN: product.batchNumber -> product.codigo_producto */}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -586,9 +645,9 @@ useEffect(() => {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{product.currentStock} unidades</div>
+                        <div className="font-medium">{product.stock_actual} unidades</div> {/* CORRECCIÓN: product.currentStock -> product.stock_actual */}
                         <div className="text-xs text-muted-foreground">
-                          Min: {product.minStock} | Max: {product.maxStock}
+                          Min: {product.stock_minimo} | Max: {product.maxStock} {/* CORRECCIÓN: product.minStock -> product.stock_minimo */}
                         </div>
                       </div>
                     </TableCell>
@@ -600,7 +659,7 @@ useEffect(() => {
                     <TableCell>
                       <div>
                         <div className="text-sm">Costo: ${product.unitCost.toFixed(2)}</div>
-                        <div className="font-medium">Precio: ${product.sellingPrice.toFixed(2)}</div>
+                        <div className="font-medium">Precio: ${product.precio_venta.toFixed(2)}</div> {/* CORRECCIÓN: product.sellingPrice -> product.precio_venta */}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -634,7 +693,7 @@ useEffect(() => {
                           size="sm"
                           onClick={() => openSaleDialog(product)}
                           title="Registrar Venta"
-                          disabled={product.currentStock <= 0}
+                          disabled={product.stock_actual <= 0} 
                         >
                           <DollarSign className="h-3 w-3" />
                         </Button>
@@ -655,7 +714,7 @@ useEffect(() => {
         </CardContent>
       </Card>
 
-      {/* Dialog para nuevo/editar producto */}
+      {/* Dialog para nuevo/editar producto (Mantiene camelCase en formData, lo cual es correcto) */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -824,7 +883,7 @@ useEffect(() => {
               {movementData.type === 'produccion' ? 'Registrar Producción' : 'Registrar Venta'}
             </DialogTitle>
             <DialogDescription>
-              {selectedProduct?.name} - Lote: {selectedProduct?.batchNumber}
+              {selectedProduct?.nombre} - Lote: {selectedProduct?.codigo_producto} {/* CORRECCIÓN: name -> nombre, batchNumber -> codigo_producto */}
             </DialogDescription>
           </DialogHeader>
           
@@ -836,14 +895,14 @@ useEffect(() => {
                   id="quantity"
                   type="number"
                   min="1"
-                  max={movementData.type === 'venta' ? selectedProduct?.currentStock : undefined}
+                  max={movementData.type === 'venta' ? selectedProduct?.stock_actual : undefined} 
                   value={movementData.quantity || ""}
                   onChange={(e) => setMovementData(prev => ({ ...prev, quantity: parseInt(e.target.value) }))}
                   required
                 />
                 {movementData.type === 'venta' && (
                   <p className="text-xs text-muted-foreground">
-                    Stock disponible: {selectedProduct?.currentStock}
+                    Stock disponible: {selectedProduct?.stock_actual} {/* CORRECCIÓN: currentStock -> stock_actual */}
                   </p>
                 )}
               </div>
@@ -931,7 +990,7 @@ useEffect(() => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {promotionSuggestions.filter(s => !s.isActive).map((suggestion) => {
-                    const product = products.find(p => p.id === suggestion.productId);
+                    const product = products.find(p => p.id_producto === suggestion.productId); // CORRECCIÓN: p.id -> p.id_producto
                     return (
                       <Card key={suggestion.id} className="border-l-4 border-l-orange-400">
                         <CardHeader className="pb-2">
@@ -961,12 +1020,12 @@ useEffect(() => {
                           
                           <div className="flex justify-between text-sm">
                             <span>Producto:</span>
-                            <span className="font-medium">{product?.name}</span>
+                            <span className="font-medium">{product?.nombre}</span> {/* CORRECCIÓN: product?.name -> product?.nombre */}
                           </div>
                           
                           <div className="flex justify-between text-sm">
                             <span>Stock actual:</span>
-                            <span className="font-medium">{product?.currentStock} unidades</span>
+                            <span className="font-medium">{product?.stock_actual} unidades</span> {/* CORRECCIÓN: product?.currentStock -> product?.stock_actual */}
                           </div>
                           
                           {suggestion.suggestedDiscount && (
@@ -990,10 +1049,10 @@ useEffect(() => {
                               <span>Productos en combo:</span>
                               <div className="mt-1">
                                 {suggestion.comboProducts.map(productId => {
-                                  const comboProduct = products.find(p => p.id === productId);
+                                  const comboProduct = products.find(p => p.id_producto === productId); // CORRECCIÓN: p.id -> p.id_producto
                                   return (
                                     <Badge key={productId} variant="outline" className="mr-1 text-xs">
-                                      {comboProduct?.name}
+                                      {comboProduct?.nombre} {/* CORRECCIÓN: comboProduct?.name -> comboProduct?.nombre */}
                                     </Badge>
                                   );
                                 })}
@@ -1036,7 +1095,8 @@ useEffect(() => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {promotionSuggestions.filter(s => s.isActive).map((suggestion) => {
-                    const product = products.find(p => p.id === suggestion.productId);
+                    // Nota: Aquí se mantiene el mapeo, aunque no se usa product en el cuerpo, es buena práctica
+                    const product = products.find(p => p.id_producto === suggestion.productId); // CORRECCIÓN: p.id -> p.id_producto
                     return (
                       <Card key={suggestion.id} className="border-l-4 border-l-green-400 bg-green-50">
                         <CardHeader className="pb-2">
@@ -1076,4 +1136,3 @@ useEffect(() => {
     </div>
   );
 }
-

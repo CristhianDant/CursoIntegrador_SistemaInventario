@@ -61,7 +61,7 @@ def read_root():
     return {"Hello": "World"}
 
 # ------------- Documentación con Scalar -------------
-@app.get("/<docs-scalar>", include_in_schema=False)
+@app.get("/docs-scalar", include_in_schema=False)
 async def scalar_docs():
     return get_scalar_api_reference(
         openapi_url=app.openapi_url,

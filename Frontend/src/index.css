@@ -55,6 +55,10 @@
       --tw-drop-shadow-size: initial;
       --tw-duration: initial;
       --tw-ease: initial;
+      /* Define el número de pasos. Si el texto tiene 25 letras, usa 25 */
+      --type-steps: 29; 
+      /* Define la duración total de la animación de escritura */
+      --type-duration: 3s;
     }
   }
 }
@@ -3264,4 +3268,34 @@ html {
     opacity: var(--tw-exit-opacity, 1);
     transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1)) rotate(var(--tw-exit-rotate, 0));
   }
+}
+
+/* Animación de escribir */
+@keyframes typing {
+  from {
+    width: 0; 
+  }
+  to {
+    width: 100%; 
+  }
+}
+
+/* Animación del cursor */
+@keyframes blink-caret {
+  50% {
+    border-color: transparent;
+  }
+}
+
+.typewriter {
+  width: fit-content; 
+  overflow: hidden; 
+  white-space: nowrap; 
+  
+  /* 🚀 CORRECCIÓN: Añadir 'forwards' a la animación de 'typing' */
+  animation: 
+    typing var(--type-duration) steps(var(--type-steps), end) forwards,
+    blink-caret 0.75s step-end infinite var(--type-duration) forwards;
+  
+  border-right: 3px solid #f97316;
 }
