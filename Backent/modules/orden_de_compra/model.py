@@ -2,7 +2,7 @@ from sqlalchemy import Column, BigInteger, String, Text, DECIMAL, TIMESTAMP, BOO
 from sqlalchemy.orm import relationship
 from database import Base
 from modules.proveedores.model import Proveedor
-from modules.usuario.model import Usuario
+from modules.Gestion_Usuarios.usuario.model import Usuario
 from modules.insumo.model import Insumo
 import datetime
 

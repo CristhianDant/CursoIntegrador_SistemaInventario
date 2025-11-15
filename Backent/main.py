@@ -7,9 +7,9 @@ from modules.empresa import router as empresa_router
 from modules.proveedores import router as proveedores_router
 from modules.insumo import router as insumo_router
 from modules.productos_terminados import router as productos_terminados_router
-from modules.usuario import router as usuario_router
-from modules.permisos import router as permisos_router
-from modules.login import router as login_router
+from modules.Gestion_Usuarios.usuario import router as usuario_router
+from modules.Gestion_Usuarios.permisos import router as permisos_router
+from modules.Gestion_Usuarios.login import router as login_router
 from modules.recetas import router as recetas_router
 from modules.orden_de_compra import router as orden_de_compra_router
 from modules.ingresos_productos import router as ingresos_productos_router

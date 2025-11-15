@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from database import Base
 from modules.insumo.model import Insumo
 from modules.productos_terminados.model import ProductoTerminado
-from modules.usuario.model import Usuario
+from modules.Gestion_Usuarios.usuario.model import Usuario
 import datetime
 
 class CalidadDesperdicioMerma(Base):

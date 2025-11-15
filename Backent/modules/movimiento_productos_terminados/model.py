@@ -2,7 +2,7 @@ from sqlalchemy import Column, BigInteger, String, Text, DECIMAL, TIMESTAMP, BOO
 from sqlalchemy.orm import relationship
 from database import Base
 from modules.productos_terminados.model import ProductoTerminado
-from modules.usuario.model import Usuario
+from modules.Gestion_Usuarios.usuario.model import Usuario
 import datetime
 
 class MovimientoProductoTerminado(Base):
