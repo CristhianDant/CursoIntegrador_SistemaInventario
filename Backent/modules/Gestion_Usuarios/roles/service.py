@@ -24,3 +24,4 @@ class RolService(RolServiceInterface):
     def delete(self, db: Session, rol_id: int) -> bool:
         return self.repository.delete(db, rol_id)
 
+

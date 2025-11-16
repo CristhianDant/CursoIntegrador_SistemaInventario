@@ -1,35 +1,24 @@
 from pydantic import BaseModel
 from typing import Optional
-import datetime
+from enums.tipo_modulo import TipoModulo
 
-# --- Permiso Schemas (Read-only) ---
 class PermisoBase(BaseModel):
-    descripcion_permiso: str
-    modulo: str
+    modulo: TipoModulo
     accion: str
+
+class PermisoCreate(PermisoBase):
+    pass
+
+class PermisoUpdate(BaseModel):
+    modulo: Optional[TipoModulo] = None
+    accion: Optional[str] = None
 
 class Permiso(PermisoBase):
     id_permiso: int
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
-# --- UsuarioPermiso Schemas (Full CRUD) ---
-class UsuarioPermisoBase(BaseModel):
-    id_user: int
+class PermisoResponse(PermisoBase):
     id_permiso: int
 
-class UsuarioPermisoCreate(UsuarioPermisoBase):
-    pass
-
-class UsuarioPermisoUpdate(BaseModel):
-    anulado: bool
-
-class UsuarioPermiso(UsuarioPermisoBase):
-    id_user_permiso: int
-    fecha_asignacion: datetime.datetime
-    anulado: bool
-
-    class Config:
-        from_attributes = True
-
+    model_config = {"from_attributes": True}

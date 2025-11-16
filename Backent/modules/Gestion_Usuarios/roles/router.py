@@ -25,10 +25,13 @@ def get_rol_by_id(rol_id: int, db: Session = Depends(get_db)):
 @router.post("/", response_model=RolResponse, status_code=201)
 def create_rol(rol: RolCreate, db: Session = Depends(get_db)):
     try:
-        new_rol = service.create(db, rol)
-        return api_response_ok(new_rol)
+        new_rol_orm = service.create(db, rol)
+        new_rol_response = RolResponse.model_validate(new_rol_orm)
+        return api_response_ok(new_rol_response)
     except ValueError as e:
         return api_response_bad_request(str(e))
+    except Exception as e:
+        return api_response_bad_request("Error al crear el rol")
 
 @router.put("/{rol_id}", response_model=RolResponse)
 def update_rol(rol_id: int, rol_update: RolUpdate, db: Session = Depends(get_db)):

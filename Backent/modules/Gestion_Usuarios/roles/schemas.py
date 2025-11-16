@@ -3,25 +3,25 @@ from typing import Optional
 
 class RolBase(BaseModel):
     nombre_rol: str
+    descripcion: Optional[str] = None
 
 class RolCreate(RolBase):
     pass
 
 class RolUpdate(BaseModel):
     nombre_rol: Optional[str] = None
+    descripcion: Optional[str] = None
     anulado: Optional[bool] = None
 
 class Rol(RolBase):
     id_rol: int
     anulado: bool
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 class RolResponse(RolBase):
     id_rol: int
     anulado: bool
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 

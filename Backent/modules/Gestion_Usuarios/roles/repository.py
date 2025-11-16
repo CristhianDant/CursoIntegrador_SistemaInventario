@@ -22,7 +22,7 @@ class RolRepository(RolRepositoryInterfaz):
     def update(self, db: Session, rol_id: int, rol_update: RolUpdate) -> Optional[Rol]:
         db_rol = self.get_by_id(db, rol_id)
         if db_rol:
-            update_data = rol_update.dict(exclude_unset=True)
+            update_data = rol_update.model_dump(exclude_unset=True)
             for key, value in update_data.items():
                 setattr(db_rol, key, value)
             db.commit()

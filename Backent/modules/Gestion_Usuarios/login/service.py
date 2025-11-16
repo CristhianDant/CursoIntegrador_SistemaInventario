@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from modules.Gestion_Usuarios.usuario.model import Usuario
-from modules.Gestion_Usuarios.permisos.model import Permiso, UsuarioPermiso
+from modules.Gestion_Usuarios.permisos.model import Permiso #UsuarioPermiso
 from security.password_utils import verify_password
 from security.jwt_utils import create_access_token
 from modules.Gestion_Usuarios.usuario.service import UsuarioService
