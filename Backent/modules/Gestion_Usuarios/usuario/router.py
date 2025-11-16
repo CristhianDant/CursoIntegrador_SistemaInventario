@@ -24,11 +24,14 @@ def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=UsuarioResponse, status_code=201)
 def create_user(user: UsuarioCreate, db: Session = Depends(get_db)):
-    db_user = service.get_by_email(db, email=user.email)
-    if db_user:
-        return api_response_bad_request("El correo electrónico ya está registrado")
-    new_user = service.create(db, user)
-    return api_response_ok(new_user)
+    try:
+        new_user_orm = service.create(db, user)
+        new_user_response = UsuarioResponse.model_validate(new_user_orm)
+        return api_response_ok(new_user_response)
+    except ValueError as e:
+        return api_response_bad_request(str(e))
+    except Exception as e:
+        return api_response_bad_request("Error al crear el usuario")
 
 @router.put("/{user_id}", response_model=UsuarioResponse)
 def update_user(user_id: int, user_update: UsuarioUpdate, db: Session = Depends(get_db)):

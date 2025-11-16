@@ -8,6 +8,7 @@ from modules.proveedores import router as proveedores_router
 from modules.insumo import router as insumo_router
 from modules.productos_terminados import router as productos_terminados_router
 from modules.Gestion_Usuarios.usuario import router as usuario_router
+from modules.Gestion_Usuarios.rol import router as rol_router
 from modules.Gestion_Usuarios.permisos import router as permisos_router
 from modules.Gestion_Usuarios.login import router as login_router
 from modules.recetas import router as recetas_router
@@ -46,6 +47,7 @@ app.include_router(proveedores_router.router, prefix="/api/v1/proveedores", tags
 app.include_router(insumo_router.router, prefix="/api/v1/insumos", tags=["Insumos"])
 app.include_router(productos_terminados_router.router, prefix="/api/v1/productos_terminados", tags=["Productos Terminados"])
 app.include_router(usuario_router.router, prefix="/api/v1/usuarios", tags=["Usuarios"])
+app.include_router(rol_router.router, prefix="/api/v1/roles", tags=["Roles"])
 app.include_router(permisos_router.router, prefix="/api/v1", tags=["Permisos"])
 app.include_router(login_router.router, prefix="/api/v1", tags=["Autenticación"])
 app.include_router(recetas_router.router, prefix="/api/v1/recetas", tags=["Recetas"])

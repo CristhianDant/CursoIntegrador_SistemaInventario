@@ -2,10 +2,9 @@ from abc import ABC, abstractmethod
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from .model import Rol
-from .schemas import RolCreate, RolUpdate
+from .schemas import Rol, RolCreate, RolUpdate
 
-class RolRepositoryInterfaz(ABC):
+class RolServiceInterface(ABC):
     @abstractmethod
     def get_all(self, db: Session) -> List[Rol]:
         pass

@@ -6,7 +6,6 @@ class Usuario(Base):
     __tablename__ = 'usuario'
 
     id_user = Column(BIGINT, primary_key=True, autoincrement=True)
-    es_admin = Column(BOOLEAN, nullable=False, default=False)
     nombre = Column(VARCHAR(255), nullable=False)
     apellidos = Column(VARCHAR(255), nullable=False)
     email = Column(VARCHAR(255), unique=True, nullable=False)

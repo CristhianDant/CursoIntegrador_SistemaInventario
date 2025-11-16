@@ -19,8 +19,6 @@ class UsuarioRepository(UsuarioRepositoryInterfaz):
     def create(self, db: Session, user: dict) -> Usuario:
         db_user = Usuario(**user)
         db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
         return db_user
 
     def update(self, db: Session, user_id: int, user_update: UsuarioUpdate) -> Optional[Usuario]:

@@ -20,11 +20,24 @@ class UsuarioService(UsuarioServiceInterface):
         return self.repository.get_by_email(db, email)
 
     def create(self, db: Session, user: UsuarioCreate) -> Usuario:
+        # Verficar si el correo electronico ya existe
+        email_user = str(user.email)
+        existing_user = self.repository.get_by_email(db, email_user)
+        if existing_user:
+            raise ValueError("El correo electrónico ya está registrado")
+        # Hash de la contraseña antes de guardar
         hashed_password = get_password_hash(user.password)
+        user.password = hashed_password
+        # Comverir el objeto Pydantic a diccionario
         user_data = user.model_dump()
-        user_data["password"] = hashed_password
-        user_data["es_admin"] = False  # Asegurar que no se creen administradores
-        return self.repository.create(db, user_data)
+        try:
+            new_user = self.repository.create(db, user_data)
+            db.commit()
+            db.refresh(new_user)
+            return new_user
+        except Exception as e:
+            db.rollback()
+            raise e from e
 
     def update(self, db: Session, user_id: int, user_update: UsuarioUpdate) -> Optional[Usuario]:
         if user_update.password:

@@ -19,20 +19,17 @@ class UsuarioUpdate(BaseModel):
 
 class Usuario(UsuarioBase):
     id_user: int
-    es_admin: bool
     fecha_registro: datetime.datetime
     ultimo_acceso: Optional[datetime.datetime] = None
     anulado: bool
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
+
 
 class UsuarioResponse(UsuarioBase):
     id_user: int
-    es_admin: bool
     fecha_registro: datetime.datetime
     ultimo_acceso: Optional[datetime.datetime] = None
     anulado: bool
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
