@@ -15,7 +15,7 @@ def get_all_roles(db: Session = Depends(get_db)):
     roles = service.get_all(db)
     return api_response_ok(roles)
 
-@router.get("/{rol_id}", response_model=RolResponse)
+@router.get("/{rol_id}", response_model=RolResponsePermisos)
 def get_rol_by_id(rol_id: int, db: Session = Depends(get_db)):
     rol = service.get_by_id(db, rol_id)
     if rol is None:

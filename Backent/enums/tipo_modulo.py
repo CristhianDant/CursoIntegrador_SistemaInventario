@@ -13,4 +13,3 @@ class TipoModulo(str, Enum):
     MERMA = "MERMA"
     REPORTES = "REPORTES"
     CONFIGURACION = "CONFIGURACION"
-

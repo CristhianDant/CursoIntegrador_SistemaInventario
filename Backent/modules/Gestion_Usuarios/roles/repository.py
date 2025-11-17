@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 
 from .model import Rol
@@ -11,11 +11,8 @@ class RolRepository(RolRepositoryInterfaz):
         return db.query(Rol).filter(Rol.anulado == False).all()
 
     def get_by_id(self, db: Session, rol_id: int) -> Optional[Rol]:
-        return db.query(Rol).filter(Rol.id_rol == rol_id, Rol.anulado == False).first()
+        return db.query(Rol).options(joinedload(Rol.permisos)).filter(Rol.id_rol == rol_id, Rol.anulado == False).first()
 
-    from modules.Gestion_Usuarios.permisos.model import Permiso
-
-# ... (código existente) ...
 
     def create_rol(self, db: Session, rol: RolCreate) -> Rol:
         """
