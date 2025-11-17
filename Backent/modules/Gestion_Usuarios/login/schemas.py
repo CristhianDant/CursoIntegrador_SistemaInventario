@@ -1,5 +1,8 @@
 from pydantic import BaseModel, EmailStr
-from typing import List
+from typing import List, Set
+
+from modules.Gestion_Usuarios.roles.schemas import RolResponse
+
 
 class Token(BaseModel):
     access_token: str
@@ -8,18 +11,15 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: str | None = None
     nombre: str | None = None
-    es_admin: bool | None = None
-    permisos: List[dict] = []
+    roles: List[str] = []
+    permisos: Set[str] = set()
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-class UserPermission(BaseModel):
-    modulo: str
-    accion: str
-
 class LoginResponse(BaseModel):
     token: Token
-    permisos: List[UserPermission]
-
+    roles: List[RolResponse]
+    nombre: str
+    email: EmailStr

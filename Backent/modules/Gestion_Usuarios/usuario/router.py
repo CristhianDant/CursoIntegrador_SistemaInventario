@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from database import get_db
-from .schemas import UsuarioResponse, UsuarioCreate, UsuarioUpdate
+from .schemas import UsuarioResponse, UsuarioCreate, UsuarioUpdate , UsuarioResponseRol
 from .service import UsuarioService
 from utils.standard_responses import api_response_ok, api_response_not_found, api_response_bad_request
 
@@ -15,12 +15,14 @@ def get_all_users(db: Session = Depends(get_db)):
     users = service.get_all(db)
     return api_response_ok(users)
 
-@router.get("/{user_id}", response_model=UsuarioResponse)
+@router.get("/{user_id}", response_model=UsuarioResponseRol)
 def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
     user = service.get_by_id(db, user_id)
     if user is None:
         return api_response_not_found("Usuario no encontrado")
-    return api_response_ok(user)
+
+    response_user = UsuarioResponseRol.model_validate(user)
+    return api_response_ok(response_user)
 
 @router.post("/", response_model=UsuarioResponse, status_code=201)
 def create_user(user: UsuarioCreate, db: Session = Depends(get_db)):

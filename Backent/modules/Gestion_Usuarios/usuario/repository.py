@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session , joinedload
 from typing import List, Optional
 from datetime import datetime, timezone
 
@@ -12,8 +12,7 @@ class UsuarioRepository(UsuarioRepositoryInterfaz):
         return db.query(Usuario).filter(Usuario.anulado == False).all()
 
     def get_by_id(self, db: Session, user_id: int) -> Optional[Usuario]:
-        return db.query(Usuario).filter(Usuario.id_user == user_id, Usuario.anulado == False).first()
-
+        return db.query(Usuario).options(joinedload(Usuario.roles)).filter(Usuario.id_user == user_id, Usuario.anulado == False).first()
     def get_by_email(self, db: Session, email: str) -> Optional[Usuario]:
         return db.query(Usuario).filter(Usuario.email == email, Usuario.anulado == False).first()
 
