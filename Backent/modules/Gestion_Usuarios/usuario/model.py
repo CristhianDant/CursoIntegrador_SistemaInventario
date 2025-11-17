@@ -1,6 +1,14 @@
-from sqlalchemy import Column, BIGINT, VARCHAR, BOOLEAN, TIMESTAMP
+from sqlalchemy import Column, BIGINT, VARCHAR, BOOLEAN, TIMESTAMP, Table, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
+
+# Tabla de asociación Usuario <-> Roles
+usuario_roles_tabla = Table('usuario_roles', Base.metadata,
+    Column('id_usuario_rol', BIGINT, primary_key=True, autoincrement=True),
+    Column('id_user', BIGINT, ForeignKey('usuario.id_user'), nullable=False),
+    Column('id_rol', BIGINT, ForeignKey('roles.id_rol'), nullable=False)
+)
 
 class Usuario(Base):
     __tablename__ = 'usuario'
@@ -14,3 +22,5 @@ class Usuario(Base):
     ultimo_acceso = Column(TIMESTAMP)
     anulado = Column(BOOLEAN, nullable=False, default=False)
 
+    # Relación con Roles
+    roles = relationship('Rol', secondary=usuario_roles_tabla, back_populates='usuarios')

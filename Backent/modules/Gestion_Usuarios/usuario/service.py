@@ -5,10 +5,12 @@ from .repository import UsuarioRepository
 from .schemas import Usuario, UsuarioCreate, UsuarioUpdate
 from .service_interface import UsuarioServiceInterface
 from security.password_utils import get_password_hash
+from modules.Gestion_Usuarios.roles.repository import RolRepository
 
 class UsuarioService(UsuarioServiceInterface):
     def __init__(self):
         self.repository = UsuarioRepository()
+        self.rol_repository = RolRepository()
 
     def get_all(self, db: Session) -> List[Usuario]:
         return self.repository.get_all(db)
@@ -25,24 +27,54 @@ class UsuarioService(UsuarioServiceInterface):
         existing_user = self.repository.get_by_email(db, email_user)
         if existing_user:
             raise ValueError("El correo electrónico ya está registrado")
+
+        # Validar que todos los roles existan
+        if user.lista_roles:
+            for rol_id in user.lista_roles:
+                rol = self.rol_repository.get_by_id(db, rol_id)
+                if not rol:
+                    raise ValueError(f"El rol con ID {rol_id} no existe.")
+
         # Hash de la contraseña antes de guardar
         hashed_password = get_password_hash(user.password)
         user.password = hashed_password
-        # Comverir el objeto Pydantic a diccionario
-        user_data = user.model_dump()
+
         try:
-            new_user = self.repository.create(db, user_data)
+            db_user = self.repository.create(db, user)
+            if user.lista_roles:
+                self.repository.save_roles_user(db, db_user, user.lista_roles)
             db.commit()
-            db.refresh(new_user)
-            return new_user
+            db.refresh(db_user)
+            return db_user
         except Exception as e:
             db.rollback()
-            raise e from e
+            raise e
 
     def update(self, db: Session, user_id: int, user_update: UsuarioUpdate) -> Optional[Usuario]:
+        db_user = self.repository.get_by_id(db, user_id)
+        if not db_user:
+            raise ValueError("El usuario no existe.")
+
+        if user_update.lista_roles is not None:
+            for rol_id in user_update.lista_roles:
+                rol = self.rol_repository.get_by_id(db, rol_id)
+                if not rol:
+                    db.rollback()
+                    raise ValueError(f"El rol con ID {rol_id} no existe.")
+
         if user_update.password:
             user_update.password = get_password_hash(user_update.password)
-        return self.repository.update(db, user_id, user_update)
+
+        self.repository.update(db, user_id, user_update)
+
+        if user_update.lista_roles is not None:
+            self.repository.clear_roles_from_user(db, db_user)
+            if user_update.lista_roles:
+                self.repository.save_roles_user(db, db_user, user_update.lista_roles)
+
+        db.commit()
+        db.refresh(db_user)
+        return db_user
 
     def delete(self, db: Session, user_id: int) -> bool:
         return self.repository.delete(db, user_id)
