@@ -18,7 +18,7 @@ def api_response_ok(data: Any) -> JSONResponse:
     response_body = {"data": data, "success": True, "code": 200}
     return JSONResponse(status_code=200, content=jsonable_encoder(response_body))
 
-def api_response_bad_request(error_message: str) -> JSONResponse:
+def api_response_bad_request(error_message) -> JSONResponse:
     """
     Genera una respuesta HTTP 400 (Bad Request) estandarizada y registra el error.
 

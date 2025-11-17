@@ -15,7 +15,7 @@ class RolRepositoryInterfaz(ABC):
         pass
 
     @abstractmethod
-    def create(self, db: Session, rol: RolCreate) -> Rol:
+    def create_rol(self, db: Session, rol: RolCreate) -> Rol:
         pass
 
     @abstractmethod
