@@ -31,10 +31,8 @@ def create_rol(rol: RolCreate, db: Session = Depends(get_db)):
     except ValueError as e:
         return api_response_bad_request(str(e))
     except Exception as e:
-        return api_response_bad_request({
-            "message": "Error al crear el rol",
-            "details": str(e)
-        })
+        print(str(e))
+        return api_response_bad_request("Error al crear el rol")
 
 @router.put("/{rol_id}", response_model=RolResponse)
 def update_rol(rol_id: int, rol_update: RolUpdate, db: Session = Depends(get_db)):

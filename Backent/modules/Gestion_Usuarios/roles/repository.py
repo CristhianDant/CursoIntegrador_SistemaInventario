@@ -29,14 +29,16 @@ class RolRepository(RolRepositoryInterfaz):
         db.refresh(db_rol)
         return db_rol
 
-    def update(self, db: Session, rol_id: int, rol_update: RolUpdate) -> Optional[Rol]:
-        db_rol = self.get_by_id(db, rol_id)
-        if db_rol:
-            update_data = rol_update.model_dump(exclude_unset=True)
-            for key, value in update_data.items():
-                setattr(db_rol, key, value)
-            db.commit()
-            db.refresh(db_rol)
+    def update(self, db: Session, db_rol: Rol, rol_update: RolUpdate) -> Rol:
+        """
+        Actualiza los campos de un objeto Rol.
+        No hace commit de la transacción.
+        """
+        update_data = rol_update.model_dump(exclude_unset=True, exclude={'lista_permisos'})
+        for key, value in update_data.items():
+            setattr(db_rol, key, value)
+        db.flush()
+        db.refresh(db_rol)
         return db_rol
 
     def delete(self, db: Session, rol_id: int) -> bool:
@@ -47,7 +49,13 @@ class RolRepository(RolRepositoryInterfaz):
             return True
         return False
 
-
+    def clear_permissions_from_rol(self, db: Session, db_rol: Rol):
+        """
+        Elimina todas las asociaciones de permisos de un rol.
+        No hace commit de la transacción.
+        """
+        db_rol.permisos.clear()
+        db.flush()
 
     def save_permissions_rol(self, db: Session, db_rol: Rol, permisos_ids: List[int]):
         """
@@ -58,5 +66,3 @@ class RolRepository(RolRepositoryInterfaz):
             permisos = db.query(Permiso).filter(Permiso.id_permiso.in_(permisos_ids)).all()
             db_rol.permisos = permisos
             db.flush()
-
-

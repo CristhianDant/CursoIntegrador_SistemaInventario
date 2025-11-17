@@ -11,9 +11,11 @@ class RolCreate(RolBase):
     pass
 
 class RolUpdate(BaseModel):
+    id_rol: int
     nombre_rol: Optional[str] = None
     descripcion: Optional[str] = None
     anulado: Optional[bool] = None
+    lista_permisos: Optional[List[int]] = None
 
 class Rol(RolBase):
     id_rol: int
