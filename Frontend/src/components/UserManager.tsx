@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit, Shield, Mail, Activity } from "lucide-react";
+import { Plus, Search, Edit, Shield, Mail, Activity, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -52,6 +52,7 @@ export function UserManager() {
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [selectedUserForSessions, setSelectedUserForSessions] = useState("");
   const [userPermissions, setUserPermissions] = useState<number[]>([]);
+  const [rolePermissions, setRolePermissions] = useState<number[]>([]);
 
   const fetchUsers = async () => {
     try {
@@ -154,11 +155,11 @@ export function UserManager() {
         id_rol: editingRole.id_rol,
         nombre_rol: roleFormData.nombre_rol,
         descripcion: roleFormData.descripcion,
-        lista_permisos: [] // TODO: Implementar asignación de permisos a roles
+        lista_permisos: rolePermissions
     } : {
         nombre_rol: roleFormData.nombre_rol,
         descripcion: roleFormData.descripcion,
-        lista_permisos: [] // TODO: Implementar asignación de permisos a roles
+        lista_permisos: rolePermissions
     };
 
     try {
@@ -173,6 +174,7 @@ export function UserManager() {
         setIsRoleDialogOpen(false);
         setEditingRole(null);
         setRoleFormData({ nombre_rol: '', descripcion: '' });
+        setRolePermissions([]);
       } else console.error('Error al guardar rol:', await response.text());
     } catch (error) { console.error('Error de conexión al guardar rol:', error); }
   };
@@ -183,10 +185,29 @@ export function UserManager() {
     setIsUserDialogOpen(true);
   };
 
-  const handleEditRole = (role: Role) => {
+  const handleEditRole = async (role: Role) => {
     setEditingRole(role);
     setRoleFormData({ nombre_rol: role.nombre_rol, descripcion: role.descripcion });
     setIsRoleDialogOpen(true);
+  
+    // Fetch and set permissions for the role
+    try {
+      const response = await fetch(`${API_BASE_URL}/v1/roles/${role.id_rol}`);
+      if (response.ok) {
+        const roleData = await response.json();
+        if (roleData.success && roleData.data && roleData.data.permisos) {
+          setRolePermissions(roleData.data.permisos.map((p: any) => p.id_permiso));
+        } else {
+          setRolePermissions([]);
+        }
+      } else {
+        console.error('Error al cargar los permisos del rol:', await response.text());
+        setRolePermissions([]);
+      }
+    } catch (error) {
+      console.error('Error de conexión al cargar los permisos del rol:', error);
+      setRolePermissions([]);
+    }
   };
 
   const openAddUserDialog = () => {
@@ -198,6 +219,7 @@ export function UserManager() {
   const openAddRoleDialog = () => {
     setEditingRole(null);
     setRoleFormData({ nombre_rol: '', descripcion: '' });
+    setRolePermissions([]);
     setIsRoleDialogOpen(true);
   };
 
@@ -244,6 +266,10 @@ export function UserManager() {
 
   const handleUserPermissionToggle = (permissionId: number, checked: boolean) => {
     setUserPermissions(prev => checked ? [...prev, permissionId] : prev.filter(id => id !== permissionId));
+  };
+
+  const handleRolePermissionToggle = (permissionId: number, checked: boolean) => {
+    setRolePermissions(prev => checked ? [...prev, permissionId] : prev.filter(id => id !== permissionId));
   };
 
   const handleViewSessions = (userName: string) => {
@@ -432,6 +458,54 @@ export function UserManager() {
               <Label htmlFor="descripcion_rol">Descripción</Label>
               <Input id="descripcion_rol" placeholder="Ej: Responsable de la línea de producción" value={roleFormData.descripcion || ""} onChange={(e) => setRoleFormData(prev => ({ ...prev, descripcion: e.target.value }))} required />
             </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="permission-input">Permisos</Label>
+              <Input
+                id="permission-input"
+                list="permission-datalist"
+                placeholder="Escribe para buscar y presiona Enter..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const inputValue = e.currentTarget.value;
+                    const selectedPermission = permissions.find(p => `${p.modulo} - ${p.accion}` === inputValue);
+                    if (selectedPermission && !rolePermissions.includes(selectedPermission.id_permiso)) {
+                      setRolePermissions(prev => [...prev, selectedPermission.id_permiso]);
+                    }
+                    e.currentTarget.value = '';
+                  }
+                }}
+              />
+              <datalist id="permission-datalist">
+                {permissions.map(p => (
+                  <option key={p.id_permiso} value={`${p.modulo} - ${p.accion}`} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Permisos Asignados</Label>
+              <div className="flex flex-wrap gap-2 min-h-[40px] max-h-32 overflow-y-auto rounded-md border border-input bg-background px-3 py-2">
+                {rolePermissions.length > 0 ? rolePermissions.map(permissionId => {
+                  const permission = permissions.find(p => p.id_permiso === permissionId);
+                  if (!permission) return null;
+                  return (
+                    <Badge key={permissionId} variant="secondary">
+                      {permission.modulo} - {permission.accion}
+                      <button
+                        type="button"
+                        className="ml-2 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        onClick={() => setRolePermissions(prev => prev.filter(id => id !== permissionId))}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  );
+                }) : <span className="text-sm text-muted-foreground">Ningún permiso asignado</span>}
+              </div>
+            </div>
+
             <div className="flex justify-end space-x-2 pt-4">
               <Button type="button" variant="outline" onClick={() => setIsRoleDialogOpen(false)}>Cancelar</Button>
               <Button type="submit">{editingRole ? "Actualizar Rol" : "Crear Rol"}</Button>
