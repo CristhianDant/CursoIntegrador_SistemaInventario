@@ -444,12 +444,15 @@ export function UserManager() {
       </Dialog>
 
       <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
-        <DialogContent className="max-w-md">
+        {/* CORRECCIÓN 1: Ancho fijo (sm:max-w-lg) y manejo de altura máxima */}
+        <DialogContent className="sm:max-w-lg w-full max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editingRole ? "Editar Rol" : "Nuevo Rol"}</DialogTitle>
             <DialogDescription>{editingRole ? "Modifica la información del rol." : "Crea un nuevo rol para asignar a los usuarios."}</DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleRoleSubmit} className="space-y-4">
+          
+          {/* Agregamos overflow-y-auto al form para que scrollee si la pantalla es pequeña */}
+          <form onSubmit={handleRoleSubmit} className="space-y-4 overflow-y-auto p-1">
             <div className="space-y-2">
               <Label htmlFor="nombre_rol">Nombre del Rol</Label>
               <Input id="nombre_rol" placeholder="Ej: Gerente de Producción" value={roleFormData.nombre_rol || ""} onChange={(e) => setRoleFormData(prev => ({ ...prev, nombre_rol: e.target.value }))} required />
@@ -486,23 +489,31 @@ export function UserManager() {
 
             <div className="space-y-2">
               <Label>Permisos Asignados</Label>
-              <div className="flex flex-wrap gap-2 min-h-[40px] max-h-32 overflow-y-auto rounded-md border border-input bg-background px-3 py-2">
+              <div className="rounded-md border border-input bg-background w-full">
+                {/* CORRECCIÓN 2: Contenedor con flex-wrap y altura limitada para scroll interno */}
+                <div className="flex flex-wrap content-start gap-2 w-full max-h-[300px] overflow-y-auto p-3">
                 {rolePermissions.length > 0 ? rolePermissions.map(permissionId => {
                   const permission = permissions.find(p => p.id_permiso === permissionId);
                   if (!permission) return null;
                   return (
-                    <Badge key={permissionId} variant="secondary">
+                    <Badge 
+                      key={permissionId} 
+                      variant="secondary" 
+                      /* CORRECCIÓN 3: Estilos para que el texto largo baje de línea sin romper el layout */
+                      className="flex items-center gap-1 pr-1 h-auto text-left break-words whitespace-normal"
+                    >
                       {permission.modulo} - {permission.accion}
                       <button
                         type="button"
-                        className="ml-2 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        className="ml-1 rounded-full outline-none hover:bg-destructive/20 focus:ring-2 focus:ring-ring focus:ring-offset-2 flex-shrink-0"
                         onClick={() => setRolePermissions(prev => prev.filter(id => id !== permissionId))}
                       >
                         <X className="h-3 w-3" />
                       </button>
                     </Badge>
                   );
-                }) : <span className="text-sm text-muted-foreground">Ningún permiso asignado</span>}
+                }) : <span className="text-sm text-muted-foreground p-1">Ningún permiso asignado</span>}
+                </div>
               </div>
             </div>
 

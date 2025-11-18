@@ -1,6 +1,7 @@
-from sqlalchemy import Column, BIGINT, VARCHAR, TEXT, DECIMAL, TIMESTAMP, BOOLEAN, func, Enum
+from sqlalchemy import Column, BIGINT, VARCHAR, TEXT, DECIMAL, TIMESTAMP, BOOLEAN, Enum
 from database import Base
 from enums.unidad_medida import UnidadMedidaEnum
+import datetime
 
 class Insumo(Base):
     __tablename__ = "insumo"
@@ -13,5 +14,5 @@ class Insumo(Base):
     stock_minimo = Column(DECIMAL(12, 4), nullable=False, default=0)
     perecible = Column(BOOLEAN, nullable=False, default=False)
     categoria = Column(VARCHAR(100))
-    fecha_registro = Column(TIMESTAMP, nullable=False, server_default=func.now())
+    fecha_registro = Column(TIMESTAMP, nullable=False, default=lambda: datetime.datetime.now(datetime.UTC))
     anulado = Column(BOOLEAN, nullable=False, default=False)
