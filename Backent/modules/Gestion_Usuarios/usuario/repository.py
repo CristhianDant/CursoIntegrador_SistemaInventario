@@ -13,8 +13,10 @@ class UsuarioRepository(UsuarioRepositoryInterfaz):
 
     def get_by_id(self, db: Session, user_id: int) -> Optional[Usuario]:
         return db.query(Usuario).options(joinedload(Usuario.roles)).filter(Usuario.id_user == user_id, Usuario.anulado == False).first()
+
+
     def get_by_email(self, db: Session, email: str) -> Optional[Usuario]:
-        return db.query(Usuario).filter(Usuario.email == email, Usuario.anulado == False).first()
+        return db.query(Usuario).options(joinedload(Usuario.roles)).filter(Usuario.email == email).first()
 
     def create(self, db: Session, user: UsuarioCreate) -> Usuario:
         user_data = user.model_dump(exclude={'lista_roles'})
