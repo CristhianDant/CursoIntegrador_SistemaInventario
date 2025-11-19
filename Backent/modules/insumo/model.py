@@ -1,4 +1,5 @@
 from sqlalchemy import Column, BIGINT, VARCHAR, TEXT, DECIMAL, TIMESTAMP, BOOLEAN, Enum
+from sqlalchemy.orm import relationship
 from database import Base
 from enums.unidad_medida import UnidadMedidaEnum
 from enums.categoria_insumo import CategoriaInsumoEnum
@@ -17,3 +18,7 @@ class Insumo(Base):
     categoria = Column(Enum(CategoriaInsumoEnum) , nullable=True)
     fecha_registro = Column(TIMESTAMP, nullable=False, default=lambda: datetime.datetime.now(datetime.UTC))
     anulado = Column(BOOLEAN, nullable=False, default=False)
+
+    # Relación inversa con RecetaDetalle
+    recetas_detalles = relationship("RecetaDetalle", back_populates="insumo")
+

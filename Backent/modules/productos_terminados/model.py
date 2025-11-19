@@ -1,4 +1,5 @@
 from sqlalchemy import Column, BIGINT, VARCHAR, TEXT, DECIMAL, INT, TIMESTAMP, BOOLEAN, Enum
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
 from enums.unidad_medida import UnidadMedidaEnum
@@ -17,3 +18,7 @@ class ProductoTerminado(Base):
     precio_venta = Column(DECIMAL(12, 2), default=0)
     fecha_registro = Column(TIMESTAMP, nullable=False, server_default=func.now())
     anulado = Column(BOOLEAN, nullable=False, default=False)
+
+    # Relación inversa con Receta
+    recetas = relationship("Receta", back_populates="producto")
+

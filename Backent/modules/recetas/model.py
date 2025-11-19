@@ -1,8 +1,6 @@
 from sqlalchemy import Column, BigInteger, String, Text, DECIMAL, TIMESTAMP, BOOLEAN, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
-from modules.productos_terminados.model import ProductoTerminado
-from modules.insumo.model import Insumo
 import datetime
 
 class Receta(Base):
@@ -20,7 +18,9 @@ class Receta(Base):
     estado = Column(String(20), default='ACTIVA')
     anulado = Column(BOOLEAN, default=False)
 
-    producto = relationship("ProductoTerminado")
+    # Relación con ProductoTerminado
+    producto = relationship("ProductoTerminado", back_populates="recetas")
+    # Relación con RecetaDetalle
     detalles = relationship("RecetaDetalle", back_populates="receta")
 
 class RecetaDetalle(Base):
@@ -35,6 +35,8 @@ class RecetaDetalle(Base):
     es_opcional = Column(BOOLEAN, default=False)
     observaciones = Column(Text)
 
+    # Relación con Receta
     receta = relationship("Receta", back_populates="detalles")
-    insumo = relationship("Insumo")
+    # Relación con Insumo
+    insumo = relationship("Insumo", back_populates="recetas_detalles")
 
