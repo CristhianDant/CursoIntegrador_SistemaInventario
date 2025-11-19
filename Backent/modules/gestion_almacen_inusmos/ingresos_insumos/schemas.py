@@ -8,11 +8,11 @@ from enums.tipo_documento import TipoDocumentoEnum
 # Detalle del ingreso de producto
 class IngresoProductoDetalleBase(BaseModel):
     id_insumo: int
-    cantidad_ordenada: Decimal
     cantidad_ingresada: Decimal
     precio_unitario: Decimal
     subtotal: Decimal
     fecha_vencimiento: Optional[datetime.datetime] = None
+    cantidad_restante: Optional[Decimal] = 0
 
 class IngresoProductoDetalleCreate(IngresoProductoDetalleBase):
     pass
@@ -27,7 +27,7 @@ class IngresoProductoDetalle(IngresoProductoDetalleBase):
 # Ingreso de producto
 class IngresoProductoBase(BaseModel):
     numero_ingreso: str
-    id_orden_compra: int
+    id_orden_compra: Optional[int] = None
     numero_documento: str
     tipo_documento: TipoDocumentoEnum
     fecha_ingreso: datetime.datetime
@@ -35,7 +35,7 @@ class IngresoProductoBase(BaseModel):
     id_user: int
     id_proveedor: int
     observaciones: Optional[str] = None
-    estado: EstadoEnum = EstadoEnum.PENDIENTE
+    estado: EstadoEnum = EstadoEnum.COMPLETADO
     monto_total: Optional[Decimal] = 0
 
 class IngresoProductoCreate(IngresoProductoBase):
