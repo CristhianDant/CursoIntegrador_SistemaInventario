@@ -60,3 +60,26 @@ class IngresoProducto(IngresoProductoBase):
     class Config:
         from_attributes = True
 
+# Schemas para FEFO
+class IngresoDetalleFefoResponse(BaseModel):
+    """Schema para respuesta de lotes FEFO"""
+    id_ingreso_detalle: int
+    id_ingreso: int
+    cantidad_ingresada: Decimal
+    cantidad_restante: Decimal
+    precio_unitario: Decimal
+    subtotal: Decimal
+    fecha_vencimiento: Optional[datetime.datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class InsumoLotesFefoResponse(BaseModel):
+    """Schema para respuesta con información del insumo y sus lotes FEFO"""
+    id_insumo: int
+    nombre_insumo: str
+    lotes: List[IngresoDetalleFefoResponse] = []
+
+    class Config:
+        from_attributes = True
+

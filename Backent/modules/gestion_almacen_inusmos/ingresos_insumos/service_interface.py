@@ -24,3 +24,8 @@ class IngresoProductoServiceInterface(ABC):
     def delete(self, db: Session, ingreso_id: int) -> dict:
         pass
 
+    @abstractmethod
+    def get_lotes_fefo(self, db: Session, id_insumo: int) -> dict:
+        """Obtiene los lotes FEFO de un insumo con información del insumo"""
+        pass
+
