@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List
 from sqlalchemy.orm import Session
-from modules.ingresos_productos.schemas import IngresoProducto, IngresoProductoCreate, IngresoProductoUpdate
+from modules.gestion_almacen_inusmos.ingresos_insumos.schemas import IngresoProducto, IngresoProductoCreate, IngresoProductoUpdate
 
 class IngresoProductoServiceInterface(ABC):
     @abstractmethod

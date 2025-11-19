@@ -1,9 +1,9 @@
 from typing import List
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
-from modules.ingresos_productos.schemas import IngresoProducto, IngresoProductoCreate, IngresoProductoUpdate
-from modules.ingresos_productos.repository import IngresoProductoRepository
-from modules.ingresos_productos.service_interface import IngresoProductoServiceInterface
+from modules.gestion_almacen_inusmos.ingresos_insumos.schemas import IngresoProducto, IngresoProductoCreate, IngresoProductoUpdate
+from modules.gestion_almacen_inusmos.ingresos_insumos.repository import IngresoProductoRepository
+from modules.gestion_almacen_inusmos.ingresos_insumos.service_interface import IngresoProductoServiceInterface
 
 class IngresoProductoService(IngresoProductoServiceInterface):
     def __init__(self):

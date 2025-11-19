@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from database import get_db
-from modules.ingresos_productos.schemas import IngresoProducto, IngresoProductoCreate, IngresoProductoUpdate
-from modules.ingresos_productos.service import IngresoProductoService
+from modules.gestion_almacen_inusmos.ingresos_insumos.schemas import IngresoProducto, IngresoProductoCreate, IngresoProductoUpdate
+from modules.gestion_almacen_inusmos.ingresos_insumos.service import IngresoProductoService
 from utils.standard_responses import api_response_ok, api_response_not_found, api_response_bad_request
 
 router = APIRouter()

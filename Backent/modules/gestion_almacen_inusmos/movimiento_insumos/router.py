@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from database import get_db
-from modules.movimiento_insumos.schemas import MovimientoInsumo
-from modules.movimiento_insumos.service import MovimientoInsumoService
+from modules.gestion_almacen_inusmos.movimiento_insumos.schemas import MovimientoInsumo
+from modules.gestion_almacen_inusmos.movimiento_insumos.service import MovimientoInsumoService
 from utils.standard_responses import api_response_ok, api_response_not_found
 
 router = APIRouter()

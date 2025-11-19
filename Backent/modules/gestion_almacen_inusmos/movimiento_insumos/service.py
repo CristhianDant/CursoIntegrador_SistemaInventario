@@ -1,9 +1,9 @@
 from typing import List
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
-from modules.movimiento_insumos.schemas import MovimientoInsumo, MovimientoInsumoCreate
-from modules.movimiento_insumos.repository import MovimientoInsumoRepository
-from modules.movimiento_insumos.service_interface import MovimientoInsumoServiceInterface
+from modules.gestion_almacen_inusmos.movimiento_insumos.schemas import MovimientoInsumo, MovimientoInsumoCreate
+from modules.gestion_almacen_inusmos.movimiento_insumos.repository import MovimientoInsumoRepository
+from modules.gestion_almacen_inusmos.movimiento_insumos.service_interface import MovimientoInsumoServiceInterface
 
 class MovimientoInsumoService(MovimientoInsumoServiceInterface):
     def __init__(self):

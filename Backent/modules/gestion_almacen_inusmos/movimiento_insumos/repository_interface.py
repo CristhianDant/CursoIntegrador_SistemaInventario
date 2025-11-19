@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from modules.movimiento_insumos.model import MovimientoInsumo
-from modules.movimiento_insumos.schemas import MovimientoInsumoCreate
+from modules.gestion_almacen_inusmos.movimiento_insumos.model import MovimientoInsumo
+from modules.gestion_almacen_inusmos.movimiento_insumos.schemas import MovimientoInsumoCreate
 
 class MovimientoInsumoRepositoryInterface(ABC):
     @abstractmethod

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List
 from sqlalchemy.orm import Session
-from modules.movimiento_insumos.schemas import MovimientoInsumo, MovimientoInsumoCreate
+from modules.gestion_almacen_inusmos.movimiento_insumos.schemas import MovimientoInsumo, MovimientoInsumoCreate
 
 class MovimientoInsumoServiceInterface(ABC):
     @abstractmethod

@@ -1,8 +1,8 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from modules.ingresos_productos.model import IngresoProducto, IngresoProductoDetalle
-from modules.ingresos_productos.schemas import IngresoProductoCreate, IngresoProductoUpdate
-from modules.ingresos_productos.repository_interface import IngresoProductoRepositoryInterface
+from modules.gestion_almacen_inusmos.ingresos_insumos.model import IngresoProducto, IngresoProductoDetalle
+from modules.gestion_almacen_inusmos.ingresos_insumos.schemas import IngresoProductoCreate, IngresoProductoUpdate
+from modules.gestion_almacen_inusmos.ingresos_insumos.repository_interface import IngresoProductoRepositoryInterface
 
 class IngresoProductoRepository(IngresoProductoRepositoryInterface):
     def get_all(self, db: Session) -> List[IngresoProducto]:

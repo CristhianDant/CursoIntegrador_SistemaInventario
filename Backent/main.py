@@ -13,9 +13,9 @@ from modules.Gestion_Usuarios.permisos import router as permisos_router
 from modules.Gestion_Usuarios.login import router as login_router
 from modules.recetas import router as recetas_router
 from modules.orden_de_compra import router as orden_de_compra_router
-from modules.ingresos_productos import router as ingresos_productos_router
+from modules.gestion_almacen_inusmos.ingresos_insumos import router as ingresos_productos_router
 from modules.calidad_desperdicio_merma import router as merma_router
-from modules.movimiento_insumos import router as movimiento_insumos_router
+from modules.gestion_almacen_inusmos.movimiento_insumos import router as movimiento_insumos_router
 from modules.movimiento_productos_terminados import router as movimiento_productos_terminados_router
 
 # Configurar el logging antes de crear la aplicación

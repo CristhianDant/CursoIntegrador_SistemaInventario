@@ -1,8 +1,8 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from modules.movimiento_insumos.model import MovimientoInsumo
-from modules.movimiento_insumos.schemas import MovimientoInsumoCreate
-from modules.movimiento_insumos.repository_interface import MovimientoInsumoRepositoryInterface
+from modules.gestion_almacen_inusmos.movimiento_insumos.model import MovimientoInsumo
+from modules.gestion_almacen_inusmos.movimiento_insumos.schemas import MovimientoInsumoCreate
+from modules.gestion_almacen_inusmos.movimiento_insumos.repository_interface import MovimientoInsumoRepositoryInterface
 
 class MovimientoInsumoRepository(MovimientoInsumoRepositoryInterface):
     def get_all(self, db: Session) -> List[MovimientoInsumo]:
