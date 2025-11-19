@@ -7,7 +7,22 @@ class InsumoService:
         self.repository = InsumoRepository(db)
 
     def create_insumo(self, insumo: InsumoCreate) -> Insumo:
-        db_insumo = self.repository.create_insumo(insumo)
+        # 1. Verificar si el código ya existe
+        existing_insumo = self.repository.get_inusmo_cod(insumo.codigo)
+        if existing_insumo:
+            raise ValueError(f"El código de insumo '{insumo.codigo}' ya existe")
+
+        # 2. Validar que stock_minimo sea >= 0
+        if insumo.stock_minimo is not None and insumo.stock_minimo < 0:
+            raise ValueError("El stock mínimo debe ser mayor o igual a 0")
+
+        # 3. Capitalizar el nombre del insumo - crear una copia modificada
+        insumo_data = insumo.model_dump()
+        insumo_data['nombre'] = insumo_data['nombre'].capitalize()
+        insumo_modificado = InsumoCreate(**insumo_data)
+
+        # 4. Crear el insumo
+        db_insumo = self.repository.create_insumo(insumo_modificado)
         return Insumo.model_validate(db_insumo)
 
     def get_insumos(self, skip: int = 0, limit: int = 100) -> list[Insumo]:

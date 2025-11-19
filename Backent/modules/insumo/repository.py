@@ -9,6 +9,9 @@ class InsumoRepository:
     def get_insumo(self, insumo_id: int) -> Insumo | None:
         return self.db.query(Insumo).filter(Insumo.id_insumo == insumo_id).first()
 
+    def get_inusmo_cod(self , codigo: str) -> Insumo | None:
+        return self.db.query(Insumo).filter(Insumo.codigo == codigo).first()
+
     def get_insumos(self, skip: int = 0, limit: int = 100) -> list[Insumo]:
         return self.db.query(Insumo).filter(Insumo.anulado == False).offset(skip).limit(limit).all()
 

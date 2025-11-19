@@ -13,8 +13,13 @@ def get_insumo_service(db: Session = Depends(get_db)) -> InsumoService:
 
 @router.post("/", response_model=Insumo)
 def create_insumo(insumo: InsumoCreate, service: InsumoService = Depends(get_insumo_service)):
-    nuevo_insumo = service.create_insumo(insumo)
-    return api_response_ok(nuevo_insumo)
+    try:
+        db_insumo = service.create_insumo(insumo)
+        return api_response_ok(db_insumo)
+    except ValueError as e:
+        return api_response_not_found(str(e))
+    except Exception as e:
+        return api_response_not_found(f"Error al crear el insumo: {str(e)}")
 
 @router.get("/", response_model=List[Insumo])
 def read_insumos(skip: int = 0, limit: int = 100, service: InsumoService = Depends(get_insumo_service)):
