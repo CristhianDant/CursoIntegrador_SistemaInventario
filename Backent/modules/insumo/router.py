@@ -35,10 +35,15 @@ def read_insumo(insumo_id: int, service: InsumoService = Depends(get_insumo_serv
 
 @router.put("/{insumo_id}", response_model=Insumo)
 def update_insumo(insumo_id: int, insumo: InsumoUpdate, service: InsumoService = Depends(get_insumo_service)):
-    db_insumo = service.update_insumo(insumo_id, insumo)
-    if db_insumo is None:
-        return api_response_not_found("Insumo no encontrado")
-    return api_response_ok(db_insumo)
+    try:
+        db_insumo = service.update_insumo(insumo_id, insumo)
+        if db_insumo is None:
+            return api_response_not_found("Insumo no encontrado")
+        return api_response_ok(db_insumo)
+    except ValueError as ve:
+        return api_response_not_found(str(ve))
+    except Exception as e:
+        return api_response_not_found(f"Error al actualizar el insumo: {str(e)}")
 
 @router.delete("/{insumo_id}", response_model=Insumo)
 def delete_insumo(insumo_id: int, service: InsumoService = Depends(get_insumo_service)):

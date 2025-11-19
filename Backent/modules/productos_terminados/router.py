@@ -25,15 +25,25 @@ def get_producto_terminado_by_id(producto_id: int, db: Session = Depends(get_db)
 
 @router.post("/", response_model=ProductoTerminado, status_code=201)
 def create_producto_terminado(producto: ProductoTerminadoCreate, db: Session = Depends(get_db)):
-    nuevo_producto = service.create(db, producto)
-    return api_response_ok(nuevo_producto)
+    try:
+        nuevo_producto = service.create(db, producto)
+        return api_response_ok(nuevo_producto)
+    except ValueError as ve:
+        return api_response_not_found(str(ve))
+    except Exception as e:
+        return api_response_not_found(str(e))
 
 @router.put("/{producto_id}", response_model=ProductoTerminado)
 def update_producto_terminado(producto_id: int, producto_update: ProductoTerminadoUpdate, db: Session = Depends(get_db)):
-    producto = service.update(db, producto_id, producto_update)
-    if producto is None:
-        return api_response_not_found("Producto terminado no encontrado")
-    return api_response_ok(producto)
+    try:
+        producto = service.update(db, producto_id, producto_update)
+        if producto is None:
+            return api_response_not_found("Producto terminado no encontrado")
+        return api_response_ok(producto)
+    except ValueError as ve:
+        return api_response_not_found(str(ve))
+    except Exception as e:
+        return api_response_not_found(str(e))
 
 @router.delete("/{producto_id}")
 def delete_producto_terminado(producto_id: int, db: Session = Depends(get_db)):

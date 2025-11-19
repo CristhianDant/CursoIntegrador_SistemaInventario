@@ -36,6 +36,17 @@ class InsumoService:
         return None
 
     def update_insumo(self, insumo_id: int, insumo: InsumoUpdate) -> Insumo | None:
+        # 1. Validar que stock_minimo sea >= 0
+        if insumo.stock_minimo is not None and insumo.stock_minimo < 0:
+            raise ValueError("El stock mínimo debe ser mayor o igual a 0")
+
+        # 2. Capitalizar el nombre del insumo si se proporciona
+        insumo_data = insumo.model_dump(exclude_unset=True)
+        if 'nombre' in insumo_data and insumo_data['nombre']:
+            insumo_data['nombre'] = insumo_data['nombre'].capitalize()
+            insumo = InsumoUpdate(**insumo_data)
+
+        # 3. Actualizar el insumo
         db_insumo = self.repository.update_insumo(insumo_id, insumo)
         if db_insumo:
             return Insumo.model_validate(db_insumo)

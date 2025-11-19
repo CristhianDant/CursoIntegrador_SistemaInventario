@@ -13,6 +13,10 @@ class ProductoTerminadoRepository(ProductoTerminadoRepositoryInterfaz):
     def get_by_id(self, db: Session, producto_id: int) -> Optional[ProductoTerminado]:
         return db.query(ProductoTerminado).filter(ProductoTerminado.id_producto == producto_id, ProductoTerminado.anulado == False).first()
 
+    def get_by_code(self, db: Session, codigo_producto: str) -> Optional[ProductoTerminado]:
+        return db.query(ProductoTerminado).filter(ProductoTerminado.codigo_producto == codigo_producto, ProductoTerminado.anulado == False).first()
+
+
     def create(self, db: Session, producto: ProductoTerminadoCreate) -> ProductoTerminado:
         db_producto = ProductoTerminado(**producto.dict())
         db.add(db_producto)
