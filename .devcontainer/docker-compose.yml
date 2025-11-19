@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database Service
+  postgres:
+    image: postgres:16-alpine
+    container_name: inventory_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: usario
+      POSTGRES_PASSWORD: mi_contraseña
+      POSTGRES_DB: mi_base_de_datos
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - inventory_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U usario -d mi_base_de_datos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Service - FastAPI with Python 3.11
+  backend:
+    image: python:3.11-slim
+    container_name: inventory_backend
+    restart: unless-stopped
+    working_dir: /workspace/Backent
+    command: >
+      bash -c "
+      if [ -f .env.example ] && [ ! -f .env ]; then
+        cp .env.example .env;
+      fi &&
+      pip install --no-cache-dir -r requirements.txt &&
+      uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      "
+    ports:
+      - "8000:8000"
+    volumes:
+      - ..:/workspace:cached
+      - notifications:/workspace/Backent/notifications
+    environment:
+      - POST_USER=usario
+      - POST_PASS=mi_contraseña
+      - POST_DB=mi_base_de_datos
+      - POST_PORT=5432
+      - POST_HOST=postgres
+      - SECRET_KEY=mi_llave_secreta
+      - ALGORITHM_TOK=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - inventory_network
+
+  # Frontend Service - React with Node.js
+  frontend:
+    image: node:20-alpine
+    container_name: inventory_frontend
+    restart: unless-stopped
+    working_dir: /workspace/Frontend
+    command: >
+      sh -c "
+      npm install &&
+      npm run dev -- --host 0.0.0.0
+      "
+    ports:
+      - "5173:5173"
+    volumes:
+      - ..:/workspace:cached
+      - frontend_node_modules:/workspace/Frontend/node_modules
+    environment:
+      - NODE_ENV=development
+    networks:
+      - inventory_network
+
+volumes:
+  postgres_data:
+  notifications:
+  frontend_node_modules:
+
+networks:
+  inventory_network:
+    driver: bridge
