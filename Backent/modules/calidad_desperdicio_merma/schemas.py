@@ -15,9 +15,11 @@ class MermaBase(BaseModel):
     fecha_caso: datetime.datetime = datetime.datetime.now()
     id_insumo: Optional[int] = None
     id_producto: Optional[int] = None
+    id_lote: Optional[int] = None
     id_user_responsable: int
     observacion: Optional[str] = None
     estado: EstadoEnum = EstadoEnum.REGISTRADO
+    anulado: bool = False
 
 class MermaCreate(MermaBase):
     pass
@@ -31,14 +33,15 @@ class MermaUpdate(BaseModel):
     fecha_caso: Optional[datetime.datetime] = None
     id_insumo: Optional[int] = None
     id_producto: Optional[int] = None
+    id_lote: Optional[int] = None
     id_user_responsable: Optional[int] = None
     observacion: Optional[str] = None
     estado: Optional[EstadoEnum] = None
+    anulado: Optional[bool] = None
 
 class Merma(MermaBase):
     id_merma: int
-    anulado: bool
+    id_lote: Optional[int] = None
 
     class Config:
         from_attributes = True
-

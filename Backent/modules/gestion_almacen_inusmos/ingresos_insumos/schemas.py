@@ -30,6 +30,7 @@ class IngresoProductoBase(BaseModel):
     id_orden_compra: Optional[int] = None
     numero_documento: str
     tipo_documento: TipoDocumentoEnum
+    fecha_registro: datetime.datetime = datetime.datetime.now()
     fecha_ingreso: datetime.datetime
     fecha_documento: datetime.datetime
     id_user: int
@@ -37,6 +38,7 @@ class IngresoProductoBase(BaseModel):
     observaciones: Optional[str] = None
     estado: EstadoEnum = EstadoEnum.COMPLETADO
     monto_total: Optional[Decimal] = 0
+    anulado: bool = False
 
 class IngresoProductoCreate(IngresoProductoBase):
     detalles: List[IngresoProductoDetalleCreate]
@@ -53,10 +55,7 @@ class IngresoProductoUpdate(BaseModel):
 
 class IngresoProducto(IngresoProductoBase):
     id_ingreso: int
-    fecha_registro: datetime.datetime
-    anulado: bool
     detalles: List[IngresoProductoDetalle] = []
 
     class Config:
         from_attributes = True
-

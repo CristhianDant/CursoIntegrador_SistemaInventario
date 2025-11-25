@@ -15,7 +15,7 @@ class IngresoProducto(Base):
     id_orden_compra = Column(BigInteger, ForeignKey('orden_de_compra.id_orden'), nullable=True)
     numero_documento = Column(String(50), nullable=False)
     tipo_documento = Column(String(20), nullable=False)
-    fecha_registro = Column(TIMESTAMP, default=datetime.datetime.now)
+    fecha_registro = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now)
     fecha_ingreso = Column(TIMESTAMP, nullable=False)
     fecha_documento = Column(TIMESTAMP, nullable=False)
     id_user = Column(BigInteger, ForeignKey('usuario.id_user'), nullable=False)
@@ -23,7 +23,7 @@ class IngresoProducto(Base):
     observaciones = Column(Text)
     estado = Column(String(20), nullable=False, default='COMPLETADO')
     monto_total = Column(DECIMAL(12, 2), default=0)
-    anulado = Column(BOOLEAN, default=False)
+    anulado = Column(BOOLEAN, nullable=False, default=False)
 
     orden_compra = relationship("OrdenDeCompra")
     usuario = relationship("Usuario")
@@ -44,4 +44,3 @@ class IngresoProductoDetalle(Base):
 
     ingreso = relationship("IngresoProducto", back_populates="detalles")
     insumo = relationship("Insumo")
-

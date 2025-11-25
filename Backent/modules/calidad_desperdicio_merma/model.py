@@ -4,6 +4,7 @@ from database import Base
 from modules.insumo.model import Insumo
 from modules.productos_terminados.model import ProductoTerminado
 from modules.Gestion_Usuarios.usuario.model import Usuario
+from modules.gestion_almacen_inusmos.ingresos_insumos.model import IngresoProductoDetalle
 import datetime
 
 class CalidadDesperdicioMerma(Base):
@@ -16,15 +17,16 @@ class CalidadDesperdicioMerma(Base):
     cantidad = Column(DECIMAL(12, 4), nullable=False)
     costo_unitario = Column(DECIMAL(12, 4), default=0)
     costo_total = Column(DECIMAL(12, 2), default=0)
-    fecha_caso = Column(TIMESTAMP, default=datetime.datetime.now)
+    fecha_caso = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now)
     id_insumo = Column(BigInteger, ForeignKey('insumo.id_insumo'))
     id_producto = Column(BigInteger, ForeignKey('productos_terminados.id_producto'))
+    id_lote = Column(BigInteger, ForeignKey('ingresos_insumos_detalle.id_ingreso_detalle'))
     id_user_responsable = Column(BigInteger, ForeignKey('usuario.id_user'), nullable=False)
     observacion = Column(Text)
     estado = Column(String(20), nullable=False, default='REGISTRADO')
-    anulado = Column(BOOLEAN, default=False)
+    anulado = Column(BOOLEAN, nullable=False, default=False)
 
     insumo = relationship("Insumo")
     producto = relationship("ProductoTerminado")
+    lote = relationship("IngresoProductoDetalle")
     responsable = relationship("Usuario")
-
