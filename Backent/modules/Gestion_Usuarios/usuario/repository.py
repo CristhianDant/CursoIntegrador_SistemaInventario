@@ -9,17 +9,26 @@ from modules.Gestion_Usuarios.roles.model import Rol
 
 class UsuarioRepository(UsuarioRepositoryInterfaz):
     def get_all(self, db: Session) -> List[Usuario]:
-        return db.query(Usuario).filter(Usuario.anulado == False).all()
+        return db.query(Usuario).options(
+            joinedload(Usuario.roles),
+            joinedload(Usuario.personal)
+        ).filter(Usuario.anulado == False).all()
 
     def get_by_id(self, db: Session, user_id: int) -> Optional[Usuario]:
-        return db.query(Usuario).options(joinedload(Usuario.roles)).filter(Usuario.id_user == user_id, Usuario.anulado == False).first()
+        return db.query(Usuario).options(
+            joinedload(Usuario.roles),
+            joinedload(Usuario.personal)
+        ).filter(Usuario.id_user == user_id, Usuario.anulado == False).first()
 
 
     def get_by_email(self, db: Session, email: str) -> Optional[Usuario]:
-        return db.query(Usuario).options(joinedload(Usuario.roles)).filter(Usuario.email == email).first()
+        return db.query(Usuario).options(
+            joinedload(Usuario.roles),
+            joinedload(Usuario.personal)
+        ).filter(Usuario.email == email).first()
 
     def create(self, db: Session, user: UsuarioCreate) -> Usuario:
-        user_data = user.model_dump(exclude={'lista_roles'})
+        user_data = user.model_dump(exclude={'lista_roles', 'personal'})
         db_user = Usuario(**user_data)
         db.add(db_user)
         db.flush()
@@ -31,7 +40,7 @@ class UsuarioRepository(UsuarioRepositoryInterfaz):
         if not db_user:
             return None
 
-        update_data = user_update.model_dump(exclude_unset=True, exclude={'lista_roles'})
+        update_data = user_update.model_dump(exclude_unset=True, exclude={'lista_roles', 'personal'})
         for key, value in update_data.items():
             setattr(db_user, key, value)
 

@@ -24,3 +24,6 @@ class Usuario(Base):
 
     # Relación con Roles
     roles = relationship('Rol', secondary=usuario_roles_tabla, back_populates='usuarios')
+
+    # Relación 1:1 con Personal
+    personal = relationship('Personal', back_populates='usuario', uselist=False, cascade='all, delete-orphan')

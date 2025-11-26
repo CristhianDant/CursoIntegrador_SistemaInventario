@@ -6,11 +6,13 @@ from .schemas import Usuario, UsuarioCreate, UsuarioUpdate
 from .service_interface import UsuarioServiceInterface
 from security.password_utils import get_password_hash
 from modules.Gestion_Usuarios.roles.repository import RolRepository
+from modules.Gestion_Usuarios.personal.repository import PersonalRepository
 
 class UsuarioService(UsuarioServiceInterface):
     def __init__(self):
         self.repository = UsuarioRepository()
         self.rol_repository = RolRepository()
+        self.personal_repository = PersonalRepository()
 
     def get_all(self, db: Session) -> List[Usuario]:
         return self.repository.get_all(db)
@@ -28,6 +30,11 @@ class UsuarioService(UsuarioServiceInterface):
         if existing_user:
             raise ValueError("El correo electrónico ya está registrado")
 
+        # Validar que el DNI no exista
+        existing_dni = self.personal_repository.get_by_dni(db, user.personal.dni)
+        if existing_dni:
+            raise ValueError("El DNI ya está registrado")
+
         # Validar que todos los roles existan
         if user.lista_roles:
             for rol_id in user.lista_roles:
@@ -40,13 +47,26 @@ class UsuarioService(UsuarioServiceInterface):
         user.password = hashed_password
 
         try:
+            # Crear usuario
             db_user = self.repository.create(db, user)
+            
+            # Crear personal asociado
+            personal_data = user.personal.model_dump()
+            personal_data['id_usuario'] = db_user.id_user
+            db_personal = self.personal_repository.create(db, personal_data)
+            
+            # Asignar personal al usuario para la relación
+            db_user.personal = db_personal
+            
+            # Guardar roles
             if user.lista_roles:
                 self.repository.save_roles_user(db, db_user, user.lista_roles)
+            
             db.commit()
             db.refresh(db_user)
             return db_user
         except Exception as e:
+            print(e)
             db.rollback()
             raise e
 
@@ -72,11 +92,33 @@ class UsuarioService(UsuarioServiceInterface):
             if user_update.lista_roles:
                 self.repository.save_roles_user(db, db_user, user_update.lista_roles)
 
+        # Actualizar datos de personal si se proporcionan
+        if user_update.personal is not None:
+            personal = self.personal_repository.get_by_usuario_id(db, user_id)
+            if personal:
+                # Validar DNI único si se está cambiando
+                if user_update.personal.dni is not None:
+                    existing_dni = self.personal_repository.get_by_dni(db, user_update.personal.dni)
+                    if existing_dni and existing_dni.id_personal != personal.id_personal:
+                        db.rollback()
+                        raise ValueError("El DNI ya está registrado por otro personal")
+                self.personal_repository.update(db, personal.id_personal, user_update.personal)
+
+        # Sincronizar estado anulado con personal
+        if user_update.anulado is not None:
+            personal = self.personal_repository.get_by_usuario_id(db, user_id)
+            if personal:
+                self.personal_repository.update_estado(db, personal.id_personal, user_update.anulado)
+
         db.commit()
         db.refresh(db_user)
         return db_user
 
     def delete(self, db: Session, user_id: int) -> bool:
+        # Sincronizar estado anulado con personal
+        personal = self.personal_repository.get_by_usuario_id(db, user_id)
+        if personal:
+            self.personal_repository.update_estado(db, personal.id_personal, True)
         return self.repository.delete(db, user_id)
 
     def update_last_access(self, db: Session, user_id: int) -> Optional[Usuario]:
