@@ -31,3 +31,11 @@ class IngresoProductoRepositoryInterface(ABC):
         (cantidad_restante DESC, fecha_vencimiento ASC)"""
         pass
 
+    @abstractmethod
+    def get_lotes_fefo_con_proveedor(self, db: Session, id_insumo: int) -> List[dict]:
+        """Retorna todos los lotes de un insumo con información del proveedor e ingreso,
+        ordenados por FEFO (fecha_vencimiento ASC, lotes sin vencimiento al final).
+        Solo retorna lotes con cantidad_restante > 0.
+        Usa raw SQL para facilitar modificaciones futuras."""
+        pass
+

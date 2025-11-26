@@ -84,3 +84,37 @@ class InsumoLotesFefoResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Schemas para FEFO con total y datos de proveedor
+class LoteConProveedorResponse(BaseModel):
+    """Schema para respuesta de lote con información del proveedor e ingreso"""
+    id_ingreso_detalle: int
+    id_ingreso: int
+    cantidad_ingresada: Decimal
+    cantidad_restante: Decimal
+    precio_unitario: Decimal
+    subtotal: Decimal
+    fecha_vencimiento: Optional[datetime.datetime] = None
+    # Datos del ingreso padre
+    numero_ingreso: str
+    fecha_ingreso: datetime.datetime
+    # Datos del proveedor
+    nombre_proveedor: str
+
+    class Config:
+        from_attributes = True
+
+
+class InsumoLotesConTotalResponse(BaseModel):
+    """Schema para respuesta con información del insumo, total de stock y lotes FEFO con proveedor"""
+    id_insumo: int
+    codigo_insumo: str
+    nombre_insumo: str
+    unidad_medida: str
+    total_cantidad_restante: Decimal
+    cantidad_lotes: int
+    lotes: List[LoteConProveedorResponse] = []
+
+    class Config:
+        from_attributes = True

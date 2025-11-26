@@ -17,6 +17,7 @@ from modules.gestion_almacen_inusmos.ingresos_insumos import router as ingresos_
 from modules.calidad_desperdicio_merma import router as merma_router
 from modules.gestion_almacen_inusmos.movimiento_insumos import router as movimiento_insumos_router
 from modules.movimiento_productos_terminados import router as movimiento_productos_terminados_router
+from modules.gestion_almacen_inusmos.produccion import router as produccion_router
 
 # Configurar el logging antes de crear la aplicación
 setup_logging()
@@ -58,6 +59,7 @@ app.include_router(ingresos_productos_router.router, prefix="/api/v1/ingresos_pr
 app.include_router(merma_router.router, prefix="/api/v1/mermas", tags=["Mermas"])
 app.include_router(movimiento_insumos_router.router, prefix="/api/v1/movimientos_insumos", tags=["Movimientos de Insumos"])
 app.include_router(movimiento_productos_terminados_router.router, prefix="/api/v1/movimientos_productos_terminados", tags=["Movimientos de Productos Terminados"])
+app.include_router(produccion_router.router, prefix="/api/v1/produccion", tags=["Produccion"])
 
 
 @app.get("/")

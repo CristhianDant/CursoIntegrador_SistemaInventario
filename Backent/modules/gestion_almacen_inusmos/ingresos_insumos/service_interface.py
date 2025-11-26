@@ -29,3 +29,9 @@ class IngresoProductoServiceInterface(ABC):
         """Obtiene los lotes FEFO de un insumo con información del insumo"""
         pass
 
+    @abstractmethod
+    def get_lotes_fefo_con_total(self, db: Session, id_insumo: int) -> dict:
+        """Obtiene los lotes FEFO de un insumo con información del proveedor,
+        el total de cantidad_restante y la cantidad de lotes disponibles"""
+        pass
+
