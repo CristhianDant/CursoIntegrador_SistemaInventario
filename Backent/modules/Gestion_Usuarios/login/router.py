@@ -36,6 +36,9 @@ def login_for_access_token(form_data: LoginRequest, db: Session = Depends(get_db
 
         return api_response_ok(login_data)
     except ValueError as e:
-        return api_response_unauthorized(str(e))
+        error_msg = str(e)
+        print(f"Error de autenticación: {error_msg}")
+        return api_response_unauthorized(error_msg)
     except Exception as e:
+        print(f"Error inesperado en login: {str(e)}")
         return api_response_unauthorized("Error al autenticar al usuario")

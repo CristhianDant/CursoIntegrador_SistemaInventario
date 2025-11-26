@@ -22,13 +22,13 @@ class LoginService:
         """
         user = self.usuario_service.get_by_email(self.db, email)
 
-        if not user :
-            return ValueError("El usuario no existe.")
+        if not user:
+            raise ValueError("El usuario no existe.")
         if user.anulado:
-            return ValueError("El usuario está anulado.")
+            raise ValueError("El usuario está anulado.")
 
         if not verify_password(password, user.password):
-            return None
+            raise ValueError("Contraseña incorrecta.")
         return user
 
     def get_user_roles(self, user: Usuario) -> List[str]:

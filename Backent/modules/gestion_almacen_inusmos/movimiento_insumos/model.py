@@ -26,5 +26,9 @@ class MovimientoInsumo(Base):
     anulado = Column(BOOLEAN, nullable=False, default=False)
 
     insumo = relationship("Insumo")
-    lote = relationship("IngresoProductoDetalle")
+    lote = relationship(
+        "IngresoProductoDetalle",
+        foreign_keys="MovimientoInsumo.id_lote",
+        primaryjoin="MovimientoInsumo.id_lote == IngresoProductoDetalle.id_ingreso_detalle"
+    )
     usuario = relationship("Usuario")
