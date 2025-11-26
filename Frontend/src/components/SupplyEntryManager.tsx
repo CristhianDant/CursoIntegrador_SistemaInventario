@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, MoreVertical, Edit, Trash2, FileText, Calendar, User, Truck, ShoppingCart, Hash, DollarSign, Package } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { API_BASE_URL } from '@/constants';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Input } from './ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Separator } from './ui/separator';
+import { Badge } from './ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { API_BASE_URL } from '../constants';
 
 // --- CONFIGURACIÓN DE URL UNIFICADA ---
-const SUPPLY_ENTRY_API_URL = `${API_BASE_URL}/v1/ingresos-productos`;
+const SUPPLY_ENTRY_API_URL = `${API_BASE_URL}/v1/ingresos_productos`;
 
 // --- INTERFACES BASADAS EN EL SCHEMA ---
 interface SupplyEntryDetail {
@@ -49,28 +49,37 @@ interface SupplyEntry {
   nombre_proveedor?: string;
 }
 
-// --- DATOS MOCK (simulando datos del backend) ---
-const mockSuppliers = [
-  { id: 1, name: "Proveedor de Harinas S.A." },
-  { id: 2, name: "Lácteos del Sur" },
-  { id: 3, name: "Distribuidora de Frutas y Verduras" },
-];
+interface Supplier {
+  id_proveedor?: number;
+  id?: number;
+  nombre_proveedor?: string;
+  nombre?: string;
+  name?: string;
+}
 
-const mockPurchaseOrders = [
-  { id: 1, number: "OC-2023-001", supplierId: 1 },
-  { id: 2, number: "OC-2023-002", supplierId: 2 },
-  { id: 3, number: "OC-2023-003", supplierId: 1 },
-];
+interface PurchaseOrder {
+  id_orden?: number;
+  id?: number;
+  numero_orden?: string;
+  number?: string;
+}
 
-const mockInsumos = [
-    { id: 1, name: "Harina de trigo", unit: "kg" },
-    { id: 2, name: "Azúcar refinada", unit: "kg" },
-    { id: 3, name: "Huevos frescos", unit: "unidades" },
-    { id: 4, name: "Mantequilla", unit: "kg" },
-];
+interface Insumo {
+  id_insumo?: number;
+  id?: number;
+  nombre_insumo?: string;
+  nombre?: string;
+  name?: string;
+  unidad_medida?: string;
+  unit?: string;
+}
 
 export function SupplyEntryManager() {
   const [entries, setEntries] = useState<SupplyEntry[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [insumos, setInsumos] = useState<Insumo[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<SupplyEntry | null>(null);
@@ -81,40 +90,84 @@ export function SupplyEntryManager() {
     tipo_documento: "FACTURA",
   });
 
+  const loadAllData = async () => {
+    try {
+      const [suppliersRes, purchaseOrdersRes, insumosRes, entriesRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/v1/proveedores`),
+        fetch(`${API_BASE_URL}/v1/ordenes_compra`),
+        fetch(`${API_BASE_URL}/v1/insumos`),
+        fetch(SUPPLY_ENTRY_API_URL),
+      ]);
+
+      // Parse suppliers
+      if (suppliersRes.ok) {
+        const suppliersData = await suppliersRes.json();
+        const suppliersList = Array.isArray(suppliersData) ? suppliersData : (suppliersData.data || []);
+        setSuppliers(suppliersList);
+      } else {
+        setSuppliers([]);
+      }
+
+      // Parse purchase orders
+      if (purchaseOrdersRes.ok) {
+        const ordersData = await purchaseOrdersRes.json();
+        const ordersList = Array.isArray(ordersData) ? ordersData : (ordersData.data || []);
+        setPurchaseOrders(ordersList);
+      } else {
+        setPurchaseOrders([]);
+      }
+
+      // Parse insumos
+      if (insumosRes.ok) {
+        const insumosData = await insumosRes.json();
+        const insumosList = Array.isArray(insumosData) ? insumosData : (insumosData.data || []);
+        setInsumos(insumosList);
+      } else {
+        setInsumos([]);
+      }
+
+      // Parse entries
+      if (entriesRes.ok) {
+        const entriesData = await entriesRes.json();
+        const entriesList = Array.isArray(entriesData) ? entriesData : (entriesData.data || []);
+        const mappedEntries = entriesList.map(mapApiToUi);
+        setEntries(mappedEntries);
+      } else {
+        setEntries([]);
+      }
+    } catch (error) {
+      console.error("Error loading data:", error);
+      // Set empty arrays on error to prevent map errors
+      setSuppliers([]);
+      setPurchaseOrders([]);
+      setInsumos([]);
+      setEntries([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const mapApiToUi = (apiEntry: any): SupplyEntry => {
-    const supplier = mockSuppliers.find(s => s.id === apiEntry.id_proveedor);
+    const supplier = suppliers.find(s => (s.id_proveedor || s.id) === apiEntry.id_proveedor);
     return {
       ...apiEntry,
       id_ingreso: apiEntry.id_ingreso,
-      nombre_proveedor: supplier?.name || 'N/A',
+      nombre_proveedor: supplier?.nombre_proveedor || supplier?.nombre || supplier?.name || 'N/A',
       fecha_ingreso: new Date(apiEntry.fecha_ingreso).toISOString().split('T')[0],
       fecha_documento: new Date(apiEntry.fecha_documento).toISOString().split('T')[0],
       detalles: (apiEntry.detalles || []).map((detail: any) => {
-        const insumo = mockInsumos.find(i => i.id === detail.id_insumo);
+        const insumo = insumos.find(i => (i.id_insumo || i.id) === detail.id_insumo);
         return {
           ...detail,
-          nombre_insumo: insumo?.name || 'Insumo desconocido',
+          nombre_insumo: insumo?.nombre_insumo || insumo?.nombre || insumo?.name || 'Insumo desconocido',
           fecha_vencimiento: detail.fecha_vencimiento ? new Date(detail.fecha_vencimiento).toISOString().split('T')[0] : undefined,
         };
       }),
     };
   };
 
-  const fetchEntries = async () => {
-    try {
-      const response = await fetch(SUPPLY_ENTRY_API_URL);
-      if (!response.ok) throw new Error('Error al cargar los ingresos');
-      const result = await response.json();
-      const mappedEntries = (result.data || result).map(mapApiToUi);
-      setEntries(mappedEntries);
-    } catch (error) {
-      console.error("Error fetching supply entries:", error);
-      // En un caso real, aquí podrías poner datos mock para desarrollo
-    }
-  };
-
   useEffect(() => {
-    fetchEntries();
+    loadAllData();
   }, []);
 
   const handleDetailChange = (index: number, field: keyof SupplyEntryDetail, value: any) => {
@@ -124,8 +177,8 @@ export function SupplyEntryManager() {
     let updatedDetail = { ...detail, [field]: value };
 
     if (field === 'id_insumo') {
-        const insumo = mockInsumos.find(i => i.id === Number(value));
-        updatedDetail.nombre_insumo = insumo?.name;
+        const insumo = insumos.find(i => (i.id_insumo || i.id) === Number(value));
+        updatedDetail.nombre_insumo = insumo?.nombre_insumo || insumo?.nombre || insumo?.name;
     }
 
     if (field === 'cantidad_ingresada' || field === 'precio_unitario') {
@@ -180,7 +233,7 @@ export function SupplyEntryManager() {
         const error = await response.json();
         throw new Error(error.message || 'Error al guardar el ingreso');
       }
-      await fetchEntries();
+      await loadAllData();
       setIsDialogOpen(false);
     } catch (error) {
       console.error("Submit error:", error);
@@ -200,7 +253,7 @@ export function SupplyEntryManager() {
       // Lógica de anulación (puede ser un PUT o un DELETE)
       const response = await fetch(`${SUPPLY_ENTRY_API_URL}/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Error al anular el ingreso');
-      await fetchEntries();
+      await loadAllData();
     } catch (error) {
       console.error("Delete error:", error);
     }
@@ -243,7 +296,7 @@ export function SupplyEntryManager() {
             <Input
               placeholder="Buscar por Nº de ingreso, documento o proveedor..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
@@ -304,23 +357,23 @@ export function SupplyEntryManager() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="numero_ingreso">Nº Ingreso</Label>
-                <Input id="numero_ingreso" value={formData.numero_ingreso || ''} onChange={e => setFormData(p => ({ ...p, numero_ingreso: e.target.value }))} required />
+                <Input id="numero_ingreso" value={formData.numero_ingreso || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, numero_ingreso: e.target.value }))} required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="id_orden_compra">Orden de Compra</Label>
-                <Select onValueChange={value => setFormData(p => ({ ...p, id_orden_compra: Number(value) }))} value={String(formData.id_orden_compra || '')}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar OC" /></SelectTrigger>
+                <Select onValueChange={(value: string) => setFormData(p => ({ ...p, id_orden_compra: Number(value) }))} value={String(formData.id_orden_compra || '')}>
+                  <SelectTrigger><SelectValue placeholder="Selecciona una orden de compra" /></SelectTrigger>
                   <SelectContent>
-                    {mockPurchaseOrders.map(oc => <SelectItem key={oc.id} value={String(oc.id)}>{oc.number}</SelectItem>)}
+                    {purchaseOrders.map((oc: PurchaseOrder) => <SelectItem key={oc.id_orden || oc.id} value={String(oc.id_orden || oc.id)}>{oc.numero_orden || oc.number}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="id_proveedor">Proveedor</Label>
-                <Select onValueChange={value => setFormData(p => ({ ...p, id_proveedor: Number(value) }))} value={String(formData.id_proveedor || '')} required>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar Proveedor" /></SelectTrigger>
+                <Select onValueChange={(value: string) => setFormData(p => ({ ...p, id_proveedor: Number(value) }))} value={String(formData.id_proveedor || '')} required>
+                  <SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger>
                   <SelectContent>
-                    {mockSuppliers.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                    {suppliers.map((s: Supplier) => <SelectItem key={s.id_proveedor || s.id} value={String(s.id_proveedor || s.id)}>{s.nombre_proveedor || s.nombre || s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -339,16 +392,16 @@ export function SupplyEntryManager() {
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="numero_documento">Nº Documento</Label>
-                    <Input id="numero_documento" value={formData.numero_documento || ''} onChange={e => setFormData(p => ({ ...p, numero_documento: e.target.value }))} required />
+                    <Input id="numero_documento" value={formData.numero_documento || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, numero_documento: e.target.value }))} required />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="fecha_documento">Fecha Documento</Label>
-                    <Input id="fecha_documento" type="date" value={formData.fecha_documento || ''} onChange={e => setFormData(p => ({ ...p, fecha_documento: e.target.value }))} required />
+                    <Input id="fecha_documento" type="date" value={formData.fecha_documento || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, fecha_documento: e.target.value }))} required />
                 </div>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="observaciones">Observaciones</Label>
-                <Textarea id="observaciones" value={formData.observaciones || ''} onChange={e => setFormData(p => ({ ...p, observaciones: e.target.value }))} />
+                <Textarea id="observaciones" value={formData.observaciones || ''} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(p => ({ ...p, observaciones: e.target.value }))} />
             </div>
 
             <Separator />
@@ -358,22 +411,76 @@ export function SupplyEntryManager() {
                 <h3 className="text-lg font-semibold">Detalles del Ingreso</h3>
                 <Button type="button" variant="outline" size="sm" onClick={addDetail}><Plus className="mr-2 h-4 w-4" /> Añadir Insumo</Button>
               </div>
+              
               <div className="space-y-2">
                 {(formData.detalles || []).map((detail, index) => (
                   <div key={index} className="grid grid-cols-12 gap-2 items-center p-2 rounded-md border">
-                    <div className="col-span-3">
-                      <Select onValueChange={value => handleDetailChange(index, 'id_insumo', value)} value={String(detail.id_insumo || '')}>
-                        <SelectTrigger><SelectValue placeholder="Insumo" /></SelectTrigger>
+                    {/* Insumo */}
+                    <div className="col-span-12 md:col-span-3">
+                      <label className="text-xs text-muted-foreground md:hidden block mb-1">Insumo</label>
+                      <Select onValueChange={(value: string) => handleDetailChange(index, 'id_insumo', value)} value={String(detail.id_insumo || '')}>
+                        <SelectTrigger><SelectValue placeholder="Selecciona insumo" /></SelectTrigger>
                         <SelectContent>
-                          {mockInsumos.map(i => <SelectItem key={i.id} value={String(i.id)}>{i.name}</SelectItem>)}
+                          {insumos.map((i: Insumo) => <SelectItem key={i.id_insumo || i.id} value={String(i.id_insumo || i.id)}>{i.nombre_insumo || i.nombre || i.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-2"><Input type="number" placeholder="Cant. Ordenada" value={detail.cantidad_ordenada} onChange={e => handleDetailChange(index, 'cantidad_ordenada', e.target.value)} /></div>
-                    <div className="col-span-2"><Input type="number" placeholder="Cant. Ingresada" value={detail.cantidad_ingresada} onChange={e => handleDetailChange(index, 'cantidad_ingresada', e.target.value)} /></div>
-                    <div className="col-span-2"><Input type="number" placeholder="Precio Unit." value={detail.precio_unitario} onChange={e => handleDetailChange(index, 'precio_unitario', e.target.value)} /></div>
-                    <div className="col-span-2"><Input readOnly value={(detail.subtotal || 0).toFixed(2)} className="bg-muted" /></div>
-                    <div className="col-span-1"><Button type="button" variant="ghost" size="icon" onClick={() => removeDetail(index)}><Trash2 className="h-4 w-4 text-red-500" /></Button></div>
+                    
+                    {/* Cantidad Ordenada */}
+                    <div className="col-span-6 md:col-span-2">
+                      <label className="text-xs text-muted-foreground block mb-1">Cant. Ordenada (Unidades)</label>
+                      <Input 
+                        type="number" 
+                        placeholder="0" 
+                        value={detail.cantidad_ordenada} 
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDetailChange(index, 'cantidad_ordenada', e.target.value)} 
+                      />
+                    </div>
+                    
+                    {/* Cantidad Ingresada */}
+                    <div className="col-span-6 md:col-span-2">
+                      <label className="text-xs text-muted-foreground block mb-1">Cant. Ingresada (Unidades)</label>
+                      <Input 
+                        type="number" 
+                        placeholder="0" 
+                        value={detail.cantidad_ingresada} 
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDetailChange(index, 'cantidad_ingresada', e.target.value)} 
+                      />
+                    </div>
+                    
+                    {/* Precio Unitario */}
+                    <div className="col-span-6 md:col-span-2">
+                      <label className="text-xs text-muted-foreground block mb-1">Precio Unit. (S/)</label>
+                      <Input 
+                        type="number" 
+                        placeholder="0.00" 
+                        value={detail.precio_unitario} 
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDetailChange(index, 'precio_unitario', e.target.value)} 
+                      />
+                    </div>
+                    
+                    {/* Subtotal */}
+                    <div className="col-span-6 md:col-span-2">
+                      <label className="text-xs text-muted-foreground block mb-1">Subtotal (S/)</label>
+                      <Input 
+                        readOnly 
+                        value={(detail.subtotal || 0).toFixed(2)} 
+                        className="bg-muted font-semibold" 
+                      />
+                    </div>
+                    
+                    {/* Botón Eliminar */}
+                    <div className="col-span-12 md:col-span-1 flex justify-end">
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => removeDetail(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

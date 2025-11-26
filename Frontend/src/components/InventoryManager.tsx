@@ -40,6 +40,7 @@ export function InventoryManager() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(null);
   const [formData, setFormData] = useState<Partial<Ingredient>>({});
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
 const fetchIngredients = async () => {
     try {
@@ -146,8 +147,8 @@ const handleSubmit = async (e: React.FormEvent) => {
         // 🔑 FIX CRÍTICO DEL PUT: Obtener el ID correctamente
         let insumoId;
         if (isEditing) {
-            // Asumimos que el ID está en la propiedad 'id' del objeto editingIngredient.
-            insumoId = (editingIngredient as Ingredient)?.id; 
+            // Obtener el ID de formData (que ya tiene todos los datos del ingrediente)
+            insumoId = (formData as Ingredient).id || (editingIngredient as Ingredient)?.id; 
             
             if (!insumoId) {
                  throw new Error("ID de insumo faltante para la operación de actualización. Revisa el estado 'editingIngredient'.");
@@ -177,10 +178,49 @@ const handleSubmit = async (e: React.FormEvent) => {
             throw new Error(`Fallo en la operación: ${response.statusText} - Detalles: ${errorMessage}`);
         }
         
-        // Lógica de éxito: Cierra el modal y recarga los datos
+        // Lógica de éxito: Actualiza la lista sin refrescar la página
+        const responseData = await response.json();
+        
+        if (isEditing) {
+            // Actualiza el insumo en la lista
+            const updatedIngredient: Ingredient = {
+                id: (editingIngredient as Ingredient).id,
+                code: formData.code || "",
+                name: formData.name || "",
+                category: formData.category || "N/A",
+                currentStock: parseFloat(formData.currentStock as any) || 0,
+                minStock: parseFloat(formData.minStock as any) || 0,
+                unit: formData.unit || "",
+                costPerUnit: parseFloat(formData.costPerUnit as any) || 0,
+                notes: formData.notes,
+                isPerishable: formData.isPerishable,
+            };
+            setIngredients(ingredients.map(i => i.id === updatedIngredient.id ? updatedIngredient : i));
+        } else {
+            // Agrega el nuevo insumo a la lista
+            const newIngredient: Ingredient = {
+                id: responseData.id_insumo || responseData.id,
+                code: formData.code || "",
+                name: formData.name || "",
+                category: formData.category || "N/A",
+                currentStock: parseFloat(formData.currentStock as any) || 0,
+                minStock: parseFloat(formData.minStock as any) || 0,
+                unit: formData.unit || "",
+                costPerUnit: parseFloat(formData.costPerUnit as any) || 0,
+                notes: formData.notes,
+                isPerishable: formData.isPerishable,
+            };
+            setIngredients([...ingredients, newIngredient]);
+        }
+        
         setIsDialogOpen(false);
-        // Si tienes una función loadIngredients() o similar, llámala aquí
-        // loadIngredients(); 
+        setFormData({});
+        setEditingIngredient(null);
+        
+        // Mostrar mensaje de éxito
+        const message = isEditing ? "Insumo actualizado exitosamente" : "Insumo creado exitosamente";
+        setSuccessMessage(message);
+        setTimeout(() => setSuccessMessage(null), 3000); 
         
     } catch (error) {
         console.error(`Error al ${isEditing ? 'actualizar' : 'crear'} el insumo:`, error);
@@ -224,6 +264,13 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   return (
     <div className="space-y-6">
+      {/* Mensaje de éxito */}
+      {successMessage && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300">
+          {successMessage}
+        </div>
+      )}
+      
       {/* Header y controles */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>

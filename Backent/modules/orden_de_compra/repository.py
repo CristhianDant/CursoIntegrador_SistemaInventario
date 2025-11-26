@@ -6,10 +6,18 @@ from modules.orden_de_compra.repository_interface import OrdenDeCompraRepository
 
 class OrdenDeCompraRepository(OrdenDeCompraRepositoryInterface):
     def get_all(self, db: Session) -> List[OrdenDeCompra]:
-        return db.query(OrdenDeCompra).filter(OrdenDeCompra.anulado == False).all()
+        ordenes = db.query(OrdenDeCompra).filter(OrdenDeCompra.anulado == False).all()
+        # Forzar carga de detalles para cada orden
+        for orden in ordenes:
+            _ = orden.detalles
+        return ordenes
 
     def get_by_id(self, db: Session, orden_id: int) -> Optional[OrdenDeCompra]:
-        return db.query(OrdenDeCompra).filter(OrdenDeCompra.id_orden == orden_id, OrdenDeCompra.anulado == False).first()
+        orden = db.query(OrdenDeCompra).filter(OrdenDeCompra.id_orden == orden_id, OrdenDeCompra.anulado == False).first()
+        if orden:
+            # Forzar carga de detalles
+            _ = orden.detalles
+        return orden
 
     def create(self, db: Session, orden: OrdenDeCompraCreate) -> OrdenDeCompra:
         orden_data = orden.model_dump(exclude={'detalles'})
@@ -24,6 +32,8 @@ class OrdenDeCompraRepository(OrdenDeCompraRepositoryInterface):
 
         db.commit()
         db.refresh(db_orden)
+        # Forzar carga de detalles
+        _ = db_orden.detalles
         return db_orden
 
     def update(self, db: Session, orden_id: int, orden: OrdenDeCompraUpdate) -> Optional[OrdenDeCompra]:
@@ -43,6 +53,8 @@ class OrdenDeCompraRepository(OrdenDeCompraRepositoryInterface):
 
             db.commit()
             db.refresh(db_orden)
+            # Forzar carga de detalles
+            _ = db_orden.detalles
         return db_orden
 
     def delete(self, db: Session, orden_id: int) -> bool:

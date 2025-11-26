@@ -12,6 +12,13 @@ import { Textarea } from "./ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { API_BASE_URL } from "../constants";
 
+// Interfaces
+interface Recipe {
+  id_receta: number;
+  nombre_receta: string;
+  costo_estimado: number;
+}
+
 interface ProductMovement {
   id: number;
   type: 'produccion' | 'venta' | 'merma';
@@ -88,10 +95,10 @@ interface FormData {
 
 // Mock data de recetas disponibles
 const availableRecipes = [
-  { id: 1, name: "Pastel de Chocolate Clásico", costPerServing: 0.71, category: "Pasteles" },
-  { id: 2, name: "Galletas de Mantequilla", costPerServing: 0.08, category: "Galletas" },
-  { id: 3, name: "Pan Integral", costPerServing: 0.35, category: "Panes" },
-  { id: 4, name: "Cheesecake de Fresa", costPerServing: 1.25, category: "Postres" },
+  { id_receta: 1, nombre_receta: "Pastel de Chocolate Clásico", costo_estimado: 0.71 },
+  { id_receta: 2, nombre_receta: "Galletas de Mantequilla", costo_estimado: 0.08 },
+  { id_receta: 3, nombre_receta: "Pan Integral", costo_estimado: 0.35 },
+  { id_receta: 4, nombre_receta: "Cheesecake de Fresa", costo_estimado: 1.25 },
 ];
 
 
@@ -105,25 +112,25 @@ const generatePromotionSuggestions = (products: FinishedProduct[]): PromotionSug
     const expiryDate = new Date(product.expiryDate);
     const daysUntilExpiry = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     
-    if (daysUntilExpiry <= 3 && product.currentStock > 0) {
+    if (daysUntilExpiry <= 3 && product.stock_actual > 0) {
       // Sugerencia de descuento directo
       const suggestedDiscount = daysUntilExpiry <= 1 ? 40 : daysUntilExpiry <= 2 ? 25 : 15;
       suggestions.push({
         id: suggestions.length + 1,
-        productId: product.id,
+        productId: product.id_producto,
         type: 'discount',
-        title: `Descuento ${suggestedDiscount}% - ${product.name}`,
+        title: `Descuento ${suggestedDiscount}% - ${product.nombre}`,
         description: `Aplicar ${suggestedDiscount}% de descuento por vencimiento en ${daysUntilExpiry} día(s)`,
         suggestedDiscount,
         daysUntilExpiry,
-        potentialSavings: product.currentStock * product.unitCost * (suggestedDiscount / 100),
+        potentialSavings: product.stock_actual * product.unitCost * (suggestedDiscount / 100),
         isActive: false
       });
       
       // Sugerencia de combo con productos complementarios
       const complementaryProducts = products.filter(p => 
-        p.id !== product.id && 
-        p.currentStock > 0 && 
+        p.id_producto !== product.id_producto && 
+        p.stock_actual > 0 && 
         (p.category === product.category || isComplementaryCategory(p.category, product.category))
       );
       
@@ -131,13 +138,13 @@ const generatePromotionSuggestions = (products: FinishedProduct[]): PromotionSug
         const comboProduct = complementaryProducts[0];
         suggestions.push({
           id: suggestions.length + 1,
-          productId: product.id,
+          productId: product.id_producto,
           type: 'combo',
-          title: `Combo Especial: ${product.name} + ${comboProduct.name}`,
-          description: `Combo de ${product.name} (por vencer) con ${comboProduct.name} - Precio especial`,
-          comboProducts: [product.id, comboProduct.id],
+          title: `Combo Especial: ${product.nombre} + ${comboProduct.nombre}`,
+          description: `Combo de ${product.nombre} (por vencer) con ${comboProduct.nombre} - Precio especial`,
+          comboProducts: [product.id_producto, comboProduct.id_producto],
           daysUntilExpiry,
-          potentialSavings: product.currentStock * product.unitCost * 0.3, // 30% de las pérdidas
+          potentialSavings: product.stock_actual * product.unitCost * 0.3, // 30% de las pérdidas
           isActive: false
         });
       }
@@ -146,13 +153,13 @@ const generatePromotionSuggestions = (products: FinishedProduct[]): PromotionSug
       if (daysUntilExpiry <= 1) {
         suggestions.push({
           id: suggestions.length + 1,
-          productId: product.id,
+          productId: product.id_producto,
           type: 'clearance',
-          title: `¡LIQUIDACIÓN URGENTE! - ${product.name}`,
+          title: `¡LIQUIDACIÓN URGENTE! - ${product.nombre}`,
           description: `Venta de liquidación - Vence mañana. Precio especial para evitar merma total`,
           suggestedDiscount: 50,
           daysUntilExpiry,
-          potentialSavings: product.currentStock * product.unitCost * 0.5,
+          potentialSavings: product.stock_actual * product.unitCost * 0.5,
           isActive: false
         });
       }
@@ -179,6 +186,7 @@ const isComplementaryCategory = (category1: string, category2: string): boolean 
 
 export function ProductManager() {
   const [products, setProducts] = useState<FinishedProduct[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>(availableRecipes); // Estado para recetas cargadas de la API
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -247,15 +255,48 @@ export function ProductManager() {
     }
 };
 
+// Función para cargar recetas desde la API
+const fetchRecipes = async () => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/v1/recetas/listar/simple`, { 
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+            console.warn('Error al cargar recetas desde el servidor, usando datos por defecto.');
+            return; // Usa los mock data como fallback
+        }
+
+        const data = await response.json();
+        
+        // Verifica que la respuesta tenga el formato { success: true, data: [...] }
+        if (data.success && Array.isArray(data.data)) {
+            const loadedRecipes: Recipe[] = data.data.map((r: any) => ({
+                id_receta: r.id_receta,
+                nombre_receta: r.nombre_receta,
+                costo_estimado: parseFloat(r.costo_estimado || 0),
+            }));
+            
+            setRecipes(loadedRecipes);
+        }
+
+    } catch (error) {
+        console.error("Fallo la carga de recetas. Usando datos por defecto:", error);
+        // Si hay error, mantiene los mock data
+    }
+};
+
 useEffect(() => {
         // Llama a la función que realiza la petición a la API
         fetchProducts(); 
+        fetchRecipes(); // Cargar recetas al montar el componente
     }, []); // El array vacío '[]' es crucial para que se ejecute solo al inicio.
 
   // Generar sugerencias de promociones automáticamente
-  useState(() => {
+  useEffect(() => {
     setPromotionSuggestions(generatePromotionSuggestions(products));
-  });
+  }, [products]);
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -277,8 +318,8 @@ useEffect(() => {
   const generateBatchNumber = (recipeId: number) => {
     const today = new Date();
     const dateStr = today.toISOString().slice(2, 10).replace(/-/g, '');
-    const recipe = availableRecipes.find(r => r.id === recipeId);
-    const prefix = recipe?.name.substring(0, 2).toUpperCase() || 'PR';
+    const recipe = recipes.find(r => r.id_receta === recipeId);
+    const prefix = recipe?.nombre_receta.substring(0, 2).toUpperCase() || 'PR';
     const sequence = '001'; // En una implementación real, esto sería incremental
     return `${prefix}${dateStr}${sequence}`;
   };
@@ -381,14 +422,52 @@ const openSaleDialog = (product: FinishedProduct) => {
     setIsMovementDialogOpen(true);
 };
 
+const handleMovementSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedProduct || !movementData.quantity || !movementData.date) {
+        console.error("Datos incompletos para el movimiento");
+        return;
+    }
+
+    // Aquí se implementaría la lógica para registrar movimientos en la API
+    // Por ahora solo actualiza el estado local
+    const updatedProducts = products.map(p => {
+        if (p.id_producto === selectedProduct.id_producto) {
+            const newStock = movementData.type === 'venta' 
+                ? p.stock_actual - (movementData.quantity || 0)
+                : p.stock_actual + (movementData.quantity || 0);
+            
+            return {
+                ...p,
+                stock_actual: Math.max(0, newStock),
+                movements: [
+                    ...p.movements,
+                    {
+                        id: p.movements.length + 1,
+                        type: movementData.type as 'produccion' | 'venta' | 'merma',
+                        quantity: movementData.quantity || 0,
+                        date: movementData.date || new Date().toISOString().split('T')[0],
+                        notes: movementData.notes
+                    }
+                ]
+            };
+        }
+        return p;
+    }) as FinishedProduct[];
+    
+    setProducts(updatedProducts);
+    setIsMovementDialogOpen(false);
+    setMovementData({});
+    setSelectedProduct(null);
+};
+
 const handleEdit = (product: FinishedProduct) => {
   setEditingProduct(product);
   
   // *** Mapeo CRÍTICO: Backend (snake_case) a UI (camelCase/form) ***
   setFormData({
     // Propiedades API/DB (product.)     = Propiedades Formulario (setFormData)
-    id_producto: product.id_producto,
-    codigo_producto: product.codigo_producto,
     name: product.nombre, // FIX: Usa product.nombre
     description: product.descripcion, // FIX: Usa product.descripcion
     currentStock: product.stock_actual, // FIX: Usa product.stock_actual
@@ -397,6 +476,7 @@ const handleEdit = (product: FinishedProduct) => {
     unitOfMeasure: product.unidad_medida, // FIX: Usa product.unidad_medida
     vida_util_dias: product.vida_util_dias, 
     anulado: product.anulado, 
+    codigo_producto: product.codigo_producto,
 
     // Campos de la UI que no vienen directamente de la API (Mantener en camelCase)
     unitCost: product.unitCost, 
@@ -407,7 +487,7 @@ const handleEdit = (product: FinishedProduct) => {
 };
 
   const handleDelete = (id: number) => {
-    setProducts(prev => prev.filter(product => product.id !== id));
+    setProducts(prev => prev.filter(product => product.id_producto !== id));
   };
 
   const openAddDialog = () => {
@@ -458,7 +538,7 @@ const handleEdit = (product: FinishedProduct) => {
     available: products.filter(p => p.status === 'Disponible').length,
     outOfStock: products.filter(p => p.status === 'Agotado').length,
     expiring: products.filter(p => p.status === 'Por Vencer').length,
-    totalValue: products.reduce((sum, p) => sum + (p.currentStock * p.sellingPrice), 0),
+    totalValue: products.reduce((sum, p) => sum + (p.stock_actual * p.precio_venta), 0),
     activeSuggestions: promotionSuggestions.filter(s => !s.isActive).length,
     potentialSavings: promotionSuggestions.reduce((sum, s) => sum + s.potentialSavings, 0)
   };
@@ -745,12 +825,11 @@ const handleEdit = (product: FinishedProduct) => {
                   value={formData.recipeId?.toString() || ""} 
                   onValueChange={(value: string) => {
                     const recipeId = parseInt(value);
-                    const recipe = availableRecipes.find(r => r.id === recipeId);
+                    const recipe = recipes.find(r => r.id_receta === recipeId);
                     setFormData(prev => ({ 
                       ...prev, 
                       recipeId,
-                      category: recipe?.category || prev.category,
-                      unitCost: recipe?.costPerServing || prev.unitCost
+                      unitCost: recipe?.costo_estimado || prev.unitCost
                     }));
                   }}
                 >
@@ -758,9 +837,9 @@ const handleEdit = (product: FinishedProduct) => {
                     <SelectValue placeholder="Selecciona receta" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableRecipes.map(recipe => (
-                      <SelectItem key={recipe.id} value={recipe.id.toString()}>
-                        {recipe.name} (${recipe.costPerServing.toFixed(2)})
+                    {recipes.map(recipe => (
+                      <SelectItem key={recipe.id_receta} value={recipe.id_receta.toString()}>
+                        {recipe.nombre_receta} (${recipe.costo_estimado.toFixed(2)})
                       </SelectItem>
                     ))}
                   </SelectContent>

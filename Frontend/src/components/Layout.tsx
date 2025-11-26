@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { 
   Home, 
   Package, 
@@ -43,6 +43,36 @@ const menuItems = [
 
 export function Layout({ children, currentPage, onPageChange, onLogout, username }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [companyName, setCompanyName] = useState('Sistema de Inventario');
+
+  // Cargar nombre de empresa desde localStorage
+  useEffect(() => {
+    const savedCompanyName = localStorage.getItem('companyName');
+    if (savedCompanyName) {
+      setCompanyName(savedCompanyName);
+    }
+
+    // Escuchar evento personalizado de cambio de nombre de empresa
+    const handleCompanyNameChange = (event: CustomEvent) => {
+      setCompanyName(event.detail.companyName);
+    };
+
+    // Escuchar cambios en localStorage
+    const handleStorageChange = () => {
+      const updatedName = localStorage.getItem('companyName');
+      if (updatedName) {
+        setCompanyName(updatedName);
+      }
+    };
+
+    window.addEventListener('companyNameChanged' as any, handleCompanyNameChange);
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('companyNameChanged' as any, handleCompanyNameChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -61,7 +91,7 @@ export function Layout({ children, currentPage, onPageChange, onLogout, username
       )}>
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center space-x-2">            <MiLogo className="h-13 w-13 text-white" />
-            <span className="text-xl font-semibold text-gray-900">Pastelería Dulce Encanto</span>
+            <span className="text-xl font-semibold text-gray-900">{companyName}</span>
           </div>
           <Button
             variant="ghost"
