@@ -36,6 +36,7 @@ class IngresoProductoDetalle(Base):
     id_ingreso_detalle = Column(BigInteger, primary_key=True, autoincrement=True)
     id_ingreso = Column(BigInteger, ForeignKey('ingresos_insumos.id_ingreso'), nullable=False)
     id_insumo = Column(BigInteger, ForeignKey('insumo.id_insumo'), nullable=False)
+    cantidad_ordenada = Column(DECIMAL(12, 4), nullable=False, default=0)
     cantidad_ingresada = Column(DECIMAL(12, 4), nullable=False)
     precio_unitario = Column(DECIMAL(12, 4), nullable=False)
     subtotal = Column(DECIMAL(12, 2), nullable=False)

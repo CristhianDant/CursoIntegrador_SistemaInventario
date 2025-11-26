@@ -7,10 +7,18 @@ from modules.gestion_almacen_inusmos.ingresos_insumos.repository_interface impor
 
 class IngresoProductoRepository(IngresoProductoRepositoryInterface):
     def get_all(self, db: Session) -> List[IngresoProducto]:
-        return db.query(IngresoProducto).filter(IngresoProducto.anulado == False).all()
+        ingresos = db.query(IngresoProducto).filter(IngresoProducto.anulado == False).all()
+        # Forzar carga de detalles
+        for ingreso in ingresos:
+            _ = ingreso.detalles
+        return ingresos
 
     def get_by_id(self, db: Session, ingreso_id: int) -> Optional[IngresoProducto]:
-        return db.query(IngresoProducto).filter(IngresoProducto.id_ingreso == ingreso_id, IngresoProducto.anulado == False).first()
+        ingreso = db.query(IngresoProducto).filter(IngresoProducto.id_ingreso == ingreso_id, IngresoProducto.anulado == False).first()
+        if ingreso:
+            # Forzar carga de detalles
+            _ = ingreso.detalles
+        return ingreso
 
     def create(self, db: Session, ingreso: IngresoProductoCreate) -> IngresoProducto:
         ingreso_data = ingreso.model_dump(exclude={'detalles'})
@@ -25,6 +33,8 @@ class IngresoProductoRepository(IngresoProductoRepositoryInterface):
 
         db.commit()
         db.refresh(db_ingreso)
+        # Forzar carga de detalles
+        _ = db_ingreso.detalles
         return db_ingreso
 
     def update(self, db: Session, ingreso_id: int, ingreso: IngresoProductoUpdate) -> Optional[IngresoProducto]:
@@ -44,6 +54,8 @@ class IngresoProductoRepository(IngresoProductoRepositoryInterface):
 
             db.commit()
             db.refresh(db_ingreso)
+            # Forzar carga de detalles
+            _ = db_ingreso.detalles
         return db_ingreso
 
     def delete(self, db: Session, ingreso_id: int) -> bool:

@@ -5,8 +5,12 @@ from modules.orden_de_compra.schemas import OrdenDeCompraCreate, OrdenDeCompraUp
 from modules.orden_de_compra.repository_interface import OrdenDeCompraRepositoryInterface
 
 class OrdenDeCompraRepository(OrdenDeCompraRepositoryInterface):
-    def get_all(self, db: Session) -> List[OrdenDeCompra]:
-        ordenes = db.query(OrdenDeCompra).filter(OrdenDeCompra.anulado == False).all()
+    def get_all(self, db: Session, activas_solo: bool = True) -> List[OrdenDeCompra]:
+        if activas_solo:
+            ordenes = db.query(OrdenDeCompra).filter(OrdenDeCompra.anulado == False).all()
+        else:
+            # Cargar todas, incluyendo anuladas (para editar ingresos con órdenes anuladas)
+            ordenes = db.query(OrdenDeCompra).all()
         # Forzar carga de detalles para cada orden
         for orden in ordenes:
             _ = orden.detalles

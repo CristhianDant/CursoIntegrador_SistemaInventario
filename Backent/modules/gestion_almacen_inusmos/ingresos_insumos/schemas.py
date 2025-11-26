@@ -8,6 +8,7 @@ from enums.tipo_documento import TipoDocumentoEnum
 # Detalle del ingreso de producto
 class IngresoProductoDetalleBase(BaseModel):
     id_insumo: int
+    cantidad_ordenada: Optional[Decimal] = 0
     cantidad_ingresada: Decimal
     precio_unitario: Decimal
     subtotal: Decimal

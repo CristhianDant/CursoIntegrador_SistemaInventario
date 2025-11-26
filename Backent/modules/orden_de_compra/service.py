@@ -9,8 +9,8 @@ class OrdenDeCompraService(OrdenDeCompraServiceInterface):
     def __init__(self):
         self.repository = OrdenDeCompraRepository()
 
-    def get_all(self, db: Session) -> List[OrdenDeCompra]:
-        return self.repository.get_all(db)
+    def get_all(self, db: Session, activas_solo: bool = True) -> List[OrdenDeCompra]:
+        return self.repository.get_all(db, activas_solo=activas_solo)
 
     def get_by_id(self, db: Session, orden_id: int) -> OrdenDeCompra:
         orden = self.repository.get_by_id(db, orden_id)
