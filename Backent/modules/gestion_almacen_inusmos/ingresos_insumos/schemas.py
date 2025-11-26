@@ -60,8 +60,7 @@ class IngresoProducto(IngresoProductoBase):
 
     class Config:
         from_attributes = True
-<<<<<<< HEAD
-=======
+
 
 # Schemas para FEFO
 class IngresoDetalleFefoResponse(BaseModel):
@@ -85,5 +84,3 @@ class InsumoLotesFefoResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
->>>>>>> feature/fefo-lotes-insumos

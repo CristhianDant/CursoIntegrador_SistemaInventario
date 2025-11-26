@@ -7,5 +7,3 @@ class EstadoEnum(str, enum.Enum):
     ANULADO = "ANULADO"
     ACTIVA = "ACTIVA"
     REGISTRADO = "REGISTRADO"
-    COMPLETADO = "COMPLETADO"
-
