@@ -8,6 +8,7 @@ from enums.tipo_documento import TipoDocumentoEnum
 # Detalle del ingreso de producto
 class IngresoProductoDetalleBase(BaseModel):
     id_insumo: int
+    cantidad_ordenada: Optional[Decimal] = 0
     cantidad_ingresada: Decimal
     precio_unitario: Decimal
     subtotal: Decimal
@@ -59,3 +60,30 @@ class IngresoProducto(IngresoProductoBase):
 
     class Config:
         from_attributes = True
+<<<<<<< HEAD
+=======
+
+# Schemas para FEFO
+class IngresoDetalleFefoResponse(BaseModel):
+    """Schema para respuesta de lotes FEFO"""
+    id_ingreso_detalle: int
+    id_ingreso: int
+    cantidad_ingresada: Decimal
+    cantidad_restante: Decimal
+    precio_unitario: Decimal
+    subtotal: Decimal
+    fecha_vencimiento: Optional[datetime.datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class InsumoLotesFefoResponse(BaseModel):
+    """Schema para respuesta con información del insumo y sus lotes FEFO"""
+    id_insumo: int
+    nombre_insumo: str
+    lotes: List[IngresoDetalleFefoResponse] = []
+
+    class Config:
+        from_attributes = True
+
+>>>>>>> feature/fefo-lotes-insumos

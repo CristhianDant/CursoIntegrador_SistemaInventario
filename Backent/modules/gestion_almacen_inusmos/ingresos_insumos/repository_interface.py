@@ -25,3 +25,9 @@ class IngresoProductoRepositoryInterface(ABC):
     def delete(self, db: Session, ingreso_id: int) -> bool:
         pass
 
+    @abstractmethod
+    def get_lotes_fefo(self, db: Session, id_insumo: int) -> List:
+        """Retorna todos los lotes (ingresos_detalle) de un insumo ordenados por FEFO
+        (cantidad_restante DESC, fecha_vencimiento ASC)"""
+        pass
+

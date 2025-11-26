@@ -51,3 +51,13 @@ class Receta(RecetaBase):
 
     class Config:
         from_attributes = True
+
+# Schema optimizado para Frontend (sin detalles para evitar exceso de datos)
+class RecetaSimple(BaseModel):
+    """Schema simplificado para listados y selecciones en Frontend"""
+    id_receta: int
+    nombre_receta: str
+    costo_estimado: Decimal
+    
+    class Config:
+        from_attributes = True

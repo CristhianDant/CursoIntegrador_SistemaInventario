@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, MoreVertical, Edit, Trash2, FileText, Calendar, User, Truck, ShoppingCart, Hash, DollarSign, Package } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { API_BASE_URL } from '@/constants';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Input } from './ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Separator } from './ui/separator';
+import { Badge } from './ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { API_BASE_URL } from '../constants';
 
 // --- CONFIGURACIÓN DE URL UNIFICADA ---
-const SUPPLY_ENTRY_API_URL = `${API_BASE_URL}/v1/ingresos-productos`;
+const SUPPLY_ENTRY_API_URL = `${API_BASE_URL}/v1/ingresos_productos`;
 
 // --- INTERFACES BASADAS EN EL SCHEMA ---
 interface SupplyEntryDetail {
@@ -49,28 +49,49 @@ interface SupplyEntry {
   nombre_proveedor?: string;
 }
 
-// --- DATOS MOCK (simulando datos del backend) ---
-const mockSuppliers = [
-  { id: 1, name: "Proveedor de Harinas S.A." },
-  { id: 2, name: "Lácteos del Sur" },
-  { id: 3, name: "Distribuidora de Frutas y Verduras" },
-];
+interface Supplier {
+  id_proveedor?: number;
+  id?: number;
+  nombre_proveedor?: string;
+  nombre?: string;
+  name?: string;
+}
 
-const mockPurchaseOrders = [
-  { id: 1, number: "OC-2023-001", supplierId: 1 },
-  { id: 2, number: "OC-2023-002", supplierId: 2 },
-  { id: 3, number: "OC-2023-003", supplierId: 1 },
-];
+interface PurchaseOrder {
+  id_orden?: number;
+  id?: number;
+  numero_orden?: string;
+  number?: string;
+}
 
-const mockInsumos = [
-    { id: 1, name: "Harina de trigo", unit: "kg" },
-    { id: 2, name: "Azúcar refinada", unit: "kg" },
-    { id: 3, name: "Huevos frescos", unit: "unidades" },
-    { id: 4, name: "Mantequilla", unit: "kg" },
-];
+interface Insumo {
+  id_insumo?: number;
+  id?: number;
+  nombre_insumo?: string;
+  nombre?: string;
+  name?: string;
+  unidad_medida?: string;
+  unit?: string;
+}
+
+interface PurchaseOrderDetailed {
+  id_orden: number;
+  numero_orden: string;
+  id_proveedor: number;
+  detalles: Array<{
+    id_insumo: number;
+    cantidad: number;
+    precio_unitario: number;
+    sub_total: number;
+  }>;
+}
 
 export function SupplyEntryManager() {
   const [entries, setEntries] = useState<SupplyEntry[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderDetailed[]>([]);
+  const [insumos, setInsumos] = useState<Insumo[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<SupplyEntry | null>(null);
@@ -81,40 +102,87 @@ export function SupplyEntryManager() {
     tipo_documento: "FACTURA",
   });
 
-  const mapApiToUi = (apiEntry: any): SupplyEntry => {
-    const supplier = mockSuppliers.find(s => s.id === apiEntry.id_proveedor);
-    return {
-      ...apiEntry,
-      id_ingreso: apiEntry.id_ingreso,
-      nombre_proveedor: supplier?.name || 'N/A',
-      fecha_ingreso: new Date(apiEntry.fecha_ingreso).toISOString().split('T')[0],
-      fecha_documento: new Date(apiEntry.fecha_documento).toISOString().split('T')[0],
-      detalles: (apiEntry.detalles || []).map((detail: any) => {
-        const insumo = mockInsumos.find(i => i.id === detail.id_insumo);
-        return {
-          ...detail,
-          nombre_insumo: insumo?.name || 'Insumo desconocido',
-          fecha_vencimiento: detail.fecha_vencimiento ? new Date(detail.fecha_vencimiento).toISOString().split('T')[0] : undefined,
-        };
-      }),
-    };
-  };
-
-  const fetchEntries = async () => {
+  const loadAllData = async (includeArchivedOrders: boolean = false) => {
+    console.log('=== INICIANDO loadAllData ===');
     try {
-      const response = await fetch(SUPPLY_ENTRY_API_URL);
-      if (!response.ok) throw new Error('Error al cargar los ingresos');
-      const result = await response.json();
-      const mappedEntries = (result.data || result).map(mapApiToUi);
-      setEntries(mappedEntries);
+      const [suppliersRes, purchaseOrdersRes, insumosRes, entriesRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/v1/proveedores`),
+        fetch(`${API_BASE_URL}/v1/ordenes_compra?activas_solo=${!includeArchivedOrders}`),
+        fetch(`${API_BASE_URL}/v1/insumos`),
+        fetch(SUPPLY_ENTRY_API_URL),
+      ]);
+
+      // Parse suppliers
+      let suppliersList: Supplier[] = [];
+      if (suppliersRes.ok) {
+        const suppliersData = await suppliersRes.json();
+        suppliersList = Array.isArray(suppliersData) ? suppliersData : (suppliersData.data || []);
+        setSuppliers(suppliersList);
+      }
+
+      // Parse purchase orders
+      let ordersList: PurchaseOrderDetailed[] = [];
+      if (purchaseOrdersRes.ok) {
+        const ordersData = await purchaseOrdersRes.json();
+        console.log('=== ORDENES_COMPRA RAW ===', ordersData);
+        ordersList = Array.isArray(ordersData) ? ordersData : (ordersData.data || []);
+        console.log('=== ORDENES_COMPRA PARSED ===', ordersList);
+        setPurchaseOrders(ordersList);
+      } else {
+        console.error('Error cargando órdenes de compra:', purchaseOrdersRes.status);
+        setPurchaseOrders([]);
+      }
+
+      // Parse insumos
+      let insumosList: Insumo[] = [];
+      if (insumosRes.ok) {
+        const insumosData = await insumosRes.json();
+        insumosList = Array.isArray(insumosData) ? insumosData : (insumosData.data || []);
+        setInsumos(insumosList);
+      }
+
+      // Parse entries y mapear con los datos ya cargados
+      if (entriesRes.ok) {
+        const entriesData = await entriesRes.json();
+        const entriesList = Array.isArray(entriesData) ? entriesData : (entriesData.data || []);
+        
+        // Mapear con los datos que ya tenemos en las variables locales
+        const mappedEntries = entriesList.map((entry: any) => {
+          const supplier = suppliersList.find(s => (s.id_proveedor || s.id) === entry.id_proveedor);
+          return {
+            ...entry,
+            id_ingreso: entry.id_ingreso,
+            nombre_proveedor: supplier?.nombre_proveedor || supplier?.nombre || supplier?.name || 'N/A',
+            fecha_ingreso: new Date(entry.fecha_ingreso).toISOString().split('T')[0],
+            fecha_documento: new Date(entry.fecha_documento).toISOString().split('T')[0],
+            detalles: (entry.detalles || []).map((detail: any) => {
+              const insumo = insumosList.find(i => (i.id_insumo || i.id) === detail.id_insumo);
+              return {
+                ...detail,
+                nombre_insumo: insumo?.nombre_insumo || insumo?.nombre || insumo?.name || 'Insumo desconocido',
+                fecha_vencimiento: detail.fecha_vencimiento ? new Date(detail.fecha_vencimiento).toISOString().split('T')[0] : undefined,
+              };
+            }),
+          };
+        });
+        
+        setEntries(mappedEntries);
+      } else {
+        setEntries([]);
+      }
     } catch (error) {
-      console.error("Error fetching supply entries:", error);
-      // En un caso real, aquí podrías poner datos mock para desarrollo
+      console.error("Error loading data:", error);
+      setSuppliers([]);
+      setPurchaseOrders([]);
+      setInsumos([]);
+      setEntries([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchEntries();
+    loadAllData(false); // Cargar solo órdenes activas en la lista inicial
   }, []);
 
   const handleDetailChange = (index: number, field: keyof SupplyEntryDetail, value: any) => {
@@ -124,8 +192,8 @@ export function SupplyEntryManager() {
     let updatedDetail = { ...detail, [field]: value };
 
     if (field === 'id_insumo') {
-        const insumo = mockInsumos.find(i => i.id === Number(value));
-        updatedDetail.nombre_insumo = insumo?.name;
+        const insumo = insumos.find(i => (i.id_insumo || i.id) === Number(value));
+        updatedDetail.nombre_insumo = insumo?.nombre_insumo || insumo?.nombre || insumo?.name;
     }
 
     if (field === 'cantidad_ingresada' || field === 'precio_unitario') {
@@ -157,6 +225,44 @@ export function SupplyEntryManager() {
     setFormData(prev => ({ ...prev, detalles: newDetails, monto_total: total }));
   };
 
+  const handleSelectPurchaseOrder = async (orderId: string) => {
+    const orden = purchaseOrders.find(o => o.id_orden === Number(orderId));
+    
+    if (!orden) {
+      console.error('Orden de compra no encontrada');
+      return;
+    }
+
+    // Buscar el proveedor de esta orden
+    const proveedor = suppliers.find(s => (s.id_proveedor || s.id) === orden.id_proveedor);
+    
+    // Mapear los detalles de la orden de compra a detalles de ingreso
+    const detallesMapados = (orden.detalles || []).map(detalle => {
+      const insumo = insumos.find(i => (i.id_insumo || i.id) === detalle.id_insumo);
+      return {
+        id_insumo: detalle.id_insumo,
+        cantidad_ordenada: detalle.cantidad,
+        cantidad_ingresada: detalle.cantidad, // Por defecto, asumimos que llegó todo
+        precio_unitario: detalle.precio_unitario,
+        subtotal: detalle.sub_total,
+        nombre_insumo: insumo?.nombre_insumo || insumo?.nombre || insumo?.name,
+      };
+    });
+
+    const totalMonto = detallesMapados.reduce((acc, d) => acc + (d.subtotal || 0), 0);
+
+    console.log('Orden seleccionada:', { orden, proveedor, detalles: detallesMapados });
+
+    // Actualizar el formulario con los datos de la orden
+    setFormData(prev => ({
+      ...prev,
+      id_orden_compra: orden.id_orden,
+      id_proveedor: orden.id_proveedor,
+      detalles: detallesMapados,
+      monto_total: totalMonto,
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const url = editingEntry ? `${SUPPLY_ENTRY_API_URL}/${editingEntry.id_ingreso}` : SUPPLY_ENTRY_API_URL;
@@ -180,7 +286,7 @@ export function SupplyEntryManager() {
         const error = await response.json();
         throw new Error(error.message || 'Error al guardar el ingreso');
       }
-      await fetchEntries();
+      await loadAllData(false); // Cargar solo órdenes activas después de guardar
       setIsDialogOpen(false);
     } catch (error) {
       console.error("Submit error:", error);
@@ -188,9 +294,51 @@ export function SupplyEntryManager() {
     }
   };
 
-  const handleEdit = (entry: SupplyEntry) => {
+  const handleEdit = async (entry: SupplyEntry) => {
+    console.log('=== EDIT: Entry ===', entry);
+    console.log('=== EDIT: id_orden_compra ===', entry.id_orden_compra);
+    
     setEditingEntry(entry);
-    setFormData(mapApiToUi(entry));
+    
+    // Si la orden no está en la lista actual (porque está anulada), cargar todas las órdenes
+    let ordenCompra = purchaseOrders.find(o => o.id_orden === entry.id_orden_compra);
+    if (!ordenCompra && entry.id_orden_compra) {
+      console.log('⚠️ ORDEN ANULADA DETECTADA - Recargando con órdenes anuladas');
+      await loadAllData(true); // true = incluir órdenes anuladas
+      // Buscar de nuevo después de recargar
+      ordenCompra = purchaseOrders.find(o => o.id_orden === entry.id_orden_compra);
+    }
+    
+    console.log('=== EDIT: ordenCompra encontrada ===', ordenCompra);
+    
+    // Mapear correctamente los detalles con los insumos actuales
+    const detallesConNombres = (entry.detalles || []).map(detail => {
+      const insumo = insumos.find(i => (i.id_insumo || i.id) === detail.id_insumo);
+      
+      // Si cantidad_ordenada no existe, buscarla en la orden de compra
+      let cantidadOrdenada = detail.cantidad_ordenada;
+      if (!cantidadOrdenada && ordenCompra) {
+        const detalleOrden = ordenCompra.detalles?.find(d => d.id_insumo === detail.id_insumo);
+        console.log(`Detalle ${detail.id_insumo} en orden:`, detalleOrden);
+        cantidadOrdenada = detalleOrden?.cantidad || detail.cantidad_ingresada || 0;
+      }
+      
+      return {
+        ...detail,
+        cantidad_ordenada: cantidadOrdenada || 0,
+        nombre_insumo: insumo?.nombre_insumo || insumo?.nombre || insumo?.name || detail.nombre_insumo || 'Insumo desconocido'
+      };
+    });
+    
+    console.log('=== EDIT: detallesConNombres ===', detallesConNombres);
+    
+    const supplier = suppliers.find(s => (s.id_proveedor || s.id) === entry.id_proveedor);
+    
+    setFormData({
+      ...entry,
+      nombre_proveedor: supplier?.nombre_proveedor || supplier?.nombre || supplier?.name || entry.nombre_proveedor || 'N/A',
+      detalles: detallesConNombres
+    });
     setIsDialogOpen(true);
   };
 
@@ -200,7 +348,7 @@ export function SupplyEntryManager() {
       // Lógica de anulación (puede ser un PUT o un DELETE)
       const response = await fetch(`${SUPPLY_ENTRY_API_URL}/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Error al anular el ingreso');
-      await fetchEntries();
+      await loadAllData(false); // Cargar solo órdenes activas después de eliminar
     } catch (error) {
       console.error("Delete error:", error);
     }
@@ -243,7 +391,7 @@ export function SupplyEntryManager() {
             <Input
               placeholder="Buscar por Nº de ingreso, documento o proveedor..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
@@ -304,25 +452,42 @@ export function SupplyEntryManager() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="numero_ingreso">Nº Ingreso</Label>
-                <Input id="numero_ingreso" value={formData.numero_ingreso || ''} onChange={e => setFormData(p => ({ ...p, numero_ingreso: e.target.value }))} required />
+                <Input id="numero_ingreso" value={formData.numero_ingreso || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, numero_ingreso: e.target.value }))} required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="id_orden_compra">Orden de Compra</Label>
-                <Select onValueChange={value => setFormData(p => ({ ...p, id_orden_compra: Number(value) }))} value={String(formData.id_orden_compra || '')}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar OC" /></SelectTrigger>
-                  <SelectContent>
-                    {mockPurchaseOrders.map(oc => <SelectItem key={oc.id} value={String(oc.id)}>{oc.number}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="id_orden_compra">Orden de Compra {!editingEntry && '*'}</Label>
+                {editingEntry ? (
+                  <div className="px-3 py-2 rounded-md border border-input bg-muted text-sm min-h-10 flex items-center">
+                    {purchaseOrders.find(o => o.id_orden === formData.id_orden_compra)?.numero_orden || 'N/A'}
+                  </div>
+                ) : (
+                  <Select 
+                    onValueChange={(value: string) => handleSelectPurchaseOrder(value)} 
+                    value={String(formData.id_orden_compra || '')}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Selecciona una orden de compra" /></SelectTrigger>
+                    <SelectContent>
+                      {(purchaseOrders as PurchaseOrderDetailed[]).map((oc: PurchaseOrderDetailed) => (
+                        <SelectItem key={oc.id_orden} value={String(oc.id_orden)}>
+                          {oc.numero_orden}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <p className="text-xs text-muted-foreground">{editingEntry ? 'No se puede cambiar la orden en edición' : 'Se cargarán automáticamente el proveedor e insumos'}</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="id_proveedor">Proveedor</Label>
-                <Select onValueChange={value => setFormData(p => ({ ...p, id_proveedor: Number(value) }))} value={String(formData.id_proveedor || '')} required>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar Proveedor" /></SelectTrigger>
-                  <SelectContent>
-                    {mockSuppliers.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <div className="px-3 py-2 rounded-md border border-input bg-muted text-sm min-h-10 flex items-center">
+                  {formData.id_proveedor ? (
+                    suppliers.find(s => (s.id_proveedor || s.id) === formData.id_proveedor)?.nombre_proveedor ||
+                    suppliers.find(s => (s.id_proveedor || s.id) === formData.id_proveedor)?.nombre ||
+                    'N/A'
+                  ) : (
+                    <span className="text-muted-foreground">Selecciona una orden de compra primero</span>
+                  )}
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -339,16 +504,16 @@ export function SupplyEntryManager() {
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="numero_documento">Nº Documento</Label>
-                    <Input id="numero_documento" value={formData.numero_documento || ''} onChange={e => setFormData(p => ({ ...p, numero_documento: e.target.value }))} required />
+                    <Input id="numero_documento" value={formData.numero_documento || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, numero_documento: e.target.value }))} required />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="fecha_documento">Fecha Documento</Label>
-                    <Input id="fecha_documento" type="date" value={formData.fecha_documento || ''} onChange={e => setFormData(p => ({ ...p, fecha_documento: e.target.value }))} required />
+                    <Input id="fecha_documento" type="date" value={formData.fecha_documento || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, fecha_documento: e.target.value }))} required />
                 </div>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="observaciones">Observaciones</Label>
-                <Textarea id="observaciones" value={formData.observaciones || ''} onChange={e => setFormData(p => ({ ...p, observaciones: e.target.value }))} />
+                <Textarea id="observaciones" value={formData.observaciones || ''} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(p => ({ ...p, observaciones: e.target.value }))} />
             </div>
 
             <Separator />
@@ -358,22 +523,108 @@ export function SupplyEntryManager() {
                 <h3 className="text-lg font-semibold">Detalles del Ingreso</h3>
                 <Button type="button" variant="outline" size="sm" onClick={addDetail}><Plus className="mr-2 h-4 w-4" /> Añadir Insumo</Button>
               </div>
-              <div className="space-y-2">
+              
+              {formData.detalles && formData.detalles.length === 0 && (
+                <div className="p-4 rounded-md bg-muted text-muted-foreground text-center">
+                  Selecciona una orden de compra para cargar automáticamente los insumos
+                </div>
+              )}
+              
+              <div className="space-y-3">
                 {(formData.detalles || []).map((detail, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-2 items-center p-2 rounded-md border">
-                    <div className="col-span-3">
-                      <Select onValueChange={value => handleDetailChange(index, 'id_insumo', value)} value={String(detail.id_insumo || '')}>
-                        <SelectTrigger><SelectValue placeholder="Insumo" /></SelectTrigger>
+                  <div key={index} className="p-3 rounded-md border bg-card space-y-3">
+                    {/* Fila 1: Insumo */}
+                    <div>
+                      <label className="text-sm font-medium block mb-1">Insumo</label>
+                      <Select 
+                        onValueChange={(value: string) => handleDetailChange(index, 'id_insumo', value)} 
+                        value={String(detail.id_insumo || '')}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Selecciona insumo" /></SelectTrigger>
                         <SelectContent>
-                          {mockInsumos.map(i => <SelectItem key={i.id} value={String(i.id)}>{i.name}</SelectItem>)}
+                          {insumos.map((i: Insumo) => (
+                            <SelectItem key={i.id_insumo || i.id} value={String(i.id_insumo || i.id)}>
+                              {i.nombre_insumo || i.nombre || i.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-2"><Input type="number" placeholder="Cant. Ordenada" value={detail.cantidad_ordenada} onChange={e => handleDetailChange(index, 'cantidad_ordenada', e.target.value)} /></div>
-                    <div className="col-span-2"><Input type="number" placeholder="Cant. Ingresada" value={detail.cantidad_ingresada} onChange={e => handleDetailChange(index, 'cantidad_ingresada', e.target.value)} /></div>
-                    <div className="col-span-2"><Input type="number" placeholder="Precio Unit." value={detail.precio_unitario} onChange={e => handleDetailChange(index, 'precio_unitario', e.target.value)} /></div>
-                    <div className="col-span-2"><Input readOnly value={(detail.subtotal || 0).toFixed(2)} className="bg-muted" /></div>
-                    <div className="col-span-1"><Button type="button" variant="ghost" size="icon" onClick={() => removeDetail(index)}><Trash2 className="h-4 w-4 text-red-500" /></Button></div>
+                    
+                    {/* Fila 2: Cantidades y Precio */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-sm font-medium block mb-1">Cant. Ordenada</label>
+                        <Input 
+                          type="number" 
+                          placeholder="0" 
+                          value={detail.cantidad_ordenada} 
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDetailChange(index, 'cantidad_ordenada', e.target.value)}
+                          readOnly
+                          className="bg-muted"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">De la orden de compra</p>
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium block mb-1">Cant. Ingresada *</label>
+                        <Input 
+                          type="number" 
+                          placeholder="0" 
+                          value={detail.cantidad_ingresada} 
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDetailChange(index, 'cantidad_ingresada', e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Lo que realmente llegó</p>
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium block mb-1">Precio Unit. (S/)</label>
+                        <Input 
+                          type="number" 
+                          placeholder="0.00" 
+                          value={detail.precio_unitario} 
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDetailChange(index, 'precio_unitario', e.target.value)}
+                          readOnly
+                          className="bg-muted"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">De la orden de compra</p>
+                      </div>
+                    </div>
+                    
+                    {/* Fila 3: Subtotal y Botón Eliminar */}
+                    <div className="flex items-end gap-3">
+                      <div className="flex-1">
+                        <label className="text-sm font-medium block mb-1">Subtotal (S/)</label>
+                        <Input 
+                          readOnly 
+                          value={(detail.subtotal || 0).toFixed(2)} 
+                          className="bg-muted font-semibold" 
+                        />
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => removeDetail(index)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    {/* Indicador de diferencia */}
+                    {detail.cantidad_ingresada !== detail.cantidad_ordenada && (
+                      <div className={`text-xs p-2 rounded ${
+                        detail.cantidad_ingresada < detail.cantidad_ordenada 
+                          ? 'bg-yellow-50 text-yellow-700' 
+                          : 'bg-green-50 text-green-700'
+                      }`}>
+                        {detail.cantidad_ingresada < detail.cantidad_ordenada 
+                          ? `⚠️ Faltan ${detail.cantidad_ordenada - detail.cantidad_ingresada} unidades`
+                          : `✓ ${detail.cantidad_ingresada - detail.cantidad_ordenada} unidades extra`
+                        }
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

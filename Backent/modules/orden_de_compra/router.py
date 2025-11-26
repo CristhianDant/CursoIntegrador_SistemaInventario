@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import Base
 from datetime import datetime
@@ -13,8 +13,8 @@ router = APIRouter()
 service = OrdenDeCompraService()
 
 @router.get("/", response_model=List[OrdenDeCompra])
-def get_all_ordenes_compra(db: Session = Depends(get_db)):
-    ordenes = service.get_all(db)
+def get_all_ordenes_compra(db: Session = Depends(get_db), activas_solo: bool = Query(True, description="Si True, solo retorna órdenes no anuladas")):
+    ordenes = service.get_all(db, activas_solo=activas_solo)
     return api_response_ok(ordenes)
 
 @router.get("/{orden_id}", response_model=OrdenDeCompra)

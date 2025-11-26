@@ -55,152 +55,60 @@ export function SettingsManager() {
   const fetchCompanyData = async () => {
     try {
       setLoading(true);
-      console.log('Intentando cargar desde:', `${API_BASE_URL}/v1/empresas`);
-      
-      const response = await fetch(`${API_BASE_URL}/v1/empresas`, {
+      const response = await fetch(`${API_BASE_URL}/v1/empresa/`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
 
-      console.log('Status:', response.status);
-
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new Error('Error al cargar configuración de empresa');
       }
 
       const data = await response.json();
-      console.log('Respuesta:', data);
       
       // La respuesta tiene formato { success: true, data: [...] }
       if (data.success && Array.isArray(data.data) && data.data.length > 0) {
         setCompany(data.data[0]); // Tomar la primera empresa
-        // Guardar nombre de la empresa en localStorage
-        localStorage.setItem('companyName', data.data[0].nombre_empresa);
-        console.log('Empresa cargada:', data.data[0]);
-      } else {
-        // Si no hay empresas, inicializar con valores vacíos para permitir crear una nueva
-        console.log('No hay empresas, inicializando formulario vacío');
-        setCompany({
-          id_empresa: 0,
-          nombre_empresa: '',
-          ruc: '',
-          email: '',
-          telefono: '',
-          direccion: '',
-          estado: true,
-          fecha_registro: new Date().toISOString()
-        });
       }
     } catch (error) {
       console.error('Error cargando empresa:', error);
-      // Si hay error, también permitir crear una nueva
-      setCompany({
-        id_empresa: 0,
-        nombre_empresa: '',
-        ruc: '',
-        email: '',
-        telefono: '',
-        direccion: '',
-        estado: true,
-        fecha_registro: new Date().toISOString()
-      });
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Error al cargar la configuración de empresa' });
+      setMessage({ type: 'error', text: 'Error al cargar la configuración de empresa' });
     } finally {
       setLoading(false);
     }
   };
 
   const handleSaveCompany = async () => {
-    if (!company) {
-      setMessage({ type: 'error', text: 'Error al procesar los datos de la empresa' });
-      return;
-    }
-
-    // Validar campos obligatorios
-    const validationErrors: string[] = [];
-    
-    if (!company.nombre_empresa || !company.nombre_empresa.trim()) {
-      validationErrors.push('Nombre de la empresa');
-    }
-    if (!company.ruc || !company.ruc.trim()) {
-      validationErrors.push('RUC');
-    }
-    if (!company.email || !company.email.trim()) {
-      validationErrors.push('Email de contacto');
-    }
-    if (!company.telefono || !company.telefono.trim()) {
-      validationErrors.push('Teléfono');
-    }
-    if (!company.direccion || !company.direccion.trim()) {
-      validationErrors.push('Dirección');
-    }
-
-    if (validationErrors.length > 0) {
-      const campos = validationErrors.join(', ');
-      setMessage({ 
-        type: 'error', 
-        text: `Por favor completa los siguientes campos: ${campos}` 
-      });
-      return;
-    }
-
-    // Validar formato de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(company.email)) {
-      setMessage({ type: 'error', text: 'Por favor ingresa un email válido' });
-      return;
-    }
+    if (!company) return;
 
     try {
       setSaving(true);
-      
-      // Si id_empresa es 0, es una empresa nueva
-      const isNewCompany = company.id_empresa === 0;
-      const method = isNewCompany ? 'POST' : 'PUT';
-      const url = isNewCompany 
-        ? `${API_BASE_URL}/v1/empresas`
-        : `${API_BASE_URL}/v1/empresas/${company.id_empresa}`;
-
-      const response = await fetch(url, {
-        method: method,
+      const response = await fetch(`${API_BASE_URL}/v1/empresa/${company.id_empresa}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nombre_empresa: company.nombre_empresa.trim(),
-          ruc: company.ruc.trim(),
-          email: company.email.trim(),
-          telefono: company.telefono.trim(),
-          direccion: company.direccion.trim(),
+          nombre_empresa: company.nombre_empresa,
+          ruc: company.ruc,
+          email: company.email,
+          telefono: company.telefono,
+          direccion: company.direccion,
           estado: company.estado
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error_message || `HTTP ${response.status}: Error al guardar`);
+        throw new Error('Error al guardar configuración');
       }
 
       const data = await response.json();
       
       if (data.success) {
-        // Si fue creada, actualizar el id_empresa
-        if (isNewCompany && data.data) {
-          setCompany({ ...company, id_empresa: data.data.id_empresa });
-        }
-        
-        // Guardar nombre de la empresa en localStorage para mostrar en el Layout
-        localStorage.setItem('companyName', company.nombre_empresa.trim());
-        
-        // Emitir evento personalizado para actualizar el Layout en tiempo real
-        window.dispatchEvent(new CustomEvent('companyNameChanged', { 
-          detail: { companyName: company.nombre_empresa.trim() } 
-        }));
-        
-        setMessage({ type: 'success', text: isNewCompany ? 'Empresa creada correctamente' : 'Configuración de empresa guardada correctamente' });
+        setMessage({ type: 'success', text: 'Configuración de empresa guardada correctamente' });
         setTimeout(() => setMessage(null), 3000);
       }
     } catch (error) {
       console.error('Error guardando empresa:', error);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Error al guardar la configuración' });
+      setMessage({ type: 'error', text: 'Error al guardar la configuración' });
     } finally {
       setSaving(false);
     }
@@ -286,7 +194,7 @@ export function SettingsManager() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {company ? (
+                {company && (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -297,7 +205,6 @@ export function SettingsManager() {
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                             handleCompanyChange('nombre_empresa', e.target.value)
                           }
-                          placeholder="Ej: Pastelería Dulce Encanto"
                         />
                       </div>
 
@@ -309,7 +216,6 @@ export function SettingsManager() {
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                             handleCompanyChange('ruc', e.target.value)
                           }
-                          placeholder="Ej: 20123456789"
                         />
                       </div>
 
@@ -322,7 +228,6 @@ export function SettingsManager() {
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                             handleCompanyChange('email', e.target.value)
                           }
-                          placeholder="contacto@empresa.com"
                         />
                       </div>
 
@@ -334,7 +239,6 @@ export function SettingsManager() {
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                             handleCompanyChange('telefono', e.target.value)
                           }
-                          placeholder="Ej: +51987654321"
                         />
                       </div>
                     </div>
@@ -358,13 +262,9 @@ export function SettingsManager() {
                       disabled={saving}
                       className="w-full"
                     >
-                      {saving ? 'Guardando...' : company.id_empresa === 0 ? 'Crear Empresa' : 'Guardar Cambios'}
+                      {saving ? 'Guardando...' : 'Guardar Cambios'}
                     </Button>
                   </>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">Cargando datos...</p>
-                  </div>
                 )}
               </CardContent>
             </Card>

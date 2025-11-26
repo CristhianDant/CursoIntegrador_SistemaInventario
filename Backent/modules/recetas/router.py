@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from database import get_db
-from modules.recetas.schemas import Receta, RecetaCreate, RecetaUpdate
+from modules.recetas.schemas import Receta, RecetaCreate, RecetaUpdate, RecetaSimple
 from modules.recetas.service import RecetaService
 from utils.standard_responses import api_response_ok, api_response_not_found, api_response_bad_request
 
@@ -48,4 +48,27 @@ def delete_receta(receta_id: int, db: Session = Depends(get_db)):
         return api_response_ok(response)
     except HTTPException as e:
         return api_response_not_found(str(e.detail))
+
+@router.get("/listar/simple", response_model=List[RecetaSimple])
+def get_recetas_simple(db: Session = Depends(get_db)):
+    """
+    Endpoint optimizado para Frontend.
+    Retorna solo los datos necesarios: id, nombre y costo estimado.
+    Ideal para selects, combos y listados ligeros.
+    No incluye detalles para minimizar payload.
+    """
+    try:
+        recetas = service.get_all(db)
+        # Mapear a RecetaSimple para minimizar datos enviados
+        recetas_simples = [
+            RecetaSimple(
+                id_receta=r.id_receta,
+                nombre_receta=r.nombre_receta,
+                costo_estimado=r.costo_estimado
+            )
+            for r in recetas
+        ]
+        return api_response_ok(recetas_simples)
+    except Exception as e:
+        return api_response_bad_request(str(e))
 
