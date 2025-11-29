@@ -13,6 +13,9 @@ class ProduccionRepository:
     Repository para operaciones de producción.
     Usa raw SQL para facilitar modificaciones futuras.
     """
+    
+    # Contador para números de movimiento en la sesión actual
+    _numero_contador = {}
 
     def _generar_numero_movimiento(self, db: Session) -> str:
         """
@@ -22,18 +25,31 @@ class ProduccionRepository:
         fecha_actual = datetime.datetime.now()
         prefijo = f"MOV-{fecha_actual.strftime('%Y%m')}-"
         
-        # Obtener el último número de movimiento del mes actual
-        ultimo_movimiento = db.query(MovimientoInsumo).filter(
-            MovimientoInsumo.numero_movimiento.like(f"{prefijo}%")
-        ).order_by(desc(MovimientoInsumo.numero_movimiento)).first()
+        # Usar contador por prefijo para asegurar unicidad en la sesión
+        if prefijo not in self._numero_contador:
+            # Obtener el máximo actual de la BD
+            query = text("""
+                SELECT COALESCE(MAX(CAST(SUBSTRING(numero_movimiento FROM LENGTH(:prefijo) + 1) AS INTEGER)), 0)
+                FROM movimiento_insumos 
+                WHERE numero_movimiento LIKE :prefijo_pattern
+            """)
+            
+            result = db.execute(query, {
+                "prefijo": prefijo,
+                "prefijo_pattern": f"{prefijo}%"
+            })
+            max_bd = result.fetchone()[0]
+            self._numero_contador[prefijo] = max_bd
         
-        if ultimo_movimiento:
-            ultimo_numero = int(ultimo_movimiento.numero_movimiento.split('-')[-1])
-            nuevo_numero = ultimo_numero + 1
-        else:
-            nuevo_numero = 1
+        # Incrementar contador
+        self._numero_contador[prefijo] += 1
+        nuevo_numero = self._numero_contador[prefijo]
         
         return f"{prefijo}{nuevo_numero:05d}"
+
+    def _reset_contador_movimientos(self):
+        """Resetea el contador de números de movimiento"""
+        self._numero_contador.clear()
 
     def get_receta_con_insumos(self, db: Session, id_receta: int) -> Dict[str, Any]:
         """
@@ -439,8 +455,7 @@ class ProduccionRepository:
                 tipo_movimiento,
                 motivo,
                 cantidad,
-                stock_anterior,
-                stock_nuevo,
+                precio_venta,
                 fecha_movimiento,
                 id_user,
                 id_documento_origen,
@@ -454,8 +469,7 @@ class ProduccionRepository:
                 'ENTRADA',
                 'PRODUCCION',
                 :cantidad,
-                :stock_anterior,
-                :stock_nuevo,
+                0,
                 NOW(),
                 :id_user,
                 :id_produccion,
@@ -470,8 +484,6 @@ class ProduccionRepository:
             "numero_movimiento": numero_movimiento,
             "id_producto": id_producto,
             "cantidad": float(cantidad),
-            "stock_anterior": float(stock_anterior),
-            "stock_nuevo": float(stock_nuevo),
             "id_user": id_user,
             "id_produccion": id_produccion,
             "observaciones": observaciones
@@ -624,8 +636,6 @@ class ProduccionRepository:
                 mpt.id_movimiento,
                 mpt.numero_movimiento,
                 mpt.cantidad,
-                mpt.stock_anterior,
-                mpt.stock_nuevo,
                 mpt.fecha_movimiento
             FROM movimiento_productos_terminados mpt
             WHERE mpt.id_documento_origen = :id_produccion
@@ -661,8 +671,6 @@ class ProduccionRepository:
                     "id_movimiento": mov_producto.id_movimiento if mov_producto else None,
                     "numero_movimiento": mov_producto.numero_movimiento if mov_producto else None,
                     "cantidad": Decimal(str(mov_producto.cantidad)) if mov_producto else None,
-                    "stock_anterior": Decimal(str(mov_producto.stock_anterior)) if mov_producto else None,
-                    "stock_nuevo": Decimal(str(mov_producto.stock_nuevo)) if mov_producto else None,
                     "fecha_movimiento": mov_producto.fecha_movimiento if mov_producto else None
                 } if mov_producto else None
             },

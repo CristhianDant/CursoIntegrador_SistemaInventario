@@ -139,9 +139,9 @@ INSERT INTO ingresos_insumos_detalle (id_ingreso, id_insumo, cantidad_ingresada,
 -- Levadura - Lote 1 (vence en 3 meses)
 ((SELECT id_ingreso FROM ingresos_insumos WHERE numero_ingreso = 'ING-2025-001'),
  (SELECT id_insumo FROM insumo WHERE codigo = 'INS-002'), 5.0000, 25.00, 125.00, '2026-02-20', 5.0000),
--- Sal - Lote 1 (sin vencimiento)
+-- Sal - Lote 1 (vence en 2 años)
 ((SELECT id_ingreso FROM ingresos_insumos WHERE numero_ingreso = 'ING-2025-001'),
- (SELECT id_insumo FROM insumo WHERE codigo = 'INS-003'), 20.0000, 1.50, 30.00, NULL, 20.0000);
+ (SELECT id_insumo FROM insumo WHERE codigo = 'INS-003'), 20.0000, 1.50, 30.00, '2027-11-20', 20.0000);
 
 -- INGRESO 2: Compra de Lácteos (Lotes con vencimiento próximo - FEFO)
 INSERT INTO ingresos_insumos (numero_ingreso, numero_documento, tipo_documento, fecha_ingreso, fecha_documento, id_user, id_proveedor, observaciones, estado, monto_total) VALUES
@@ -199,10 +199,31 @@ INSERT INTO ingresos_insumos_detalle (id_ingreso, id_insumo, cantidad_ingresada,
  (SELECT id_insumo FROM insumo WHERE codigo = 'INS-008'), 10.0000, 6.00, 60.00, '2027-11-18', 10.0000),
 -- Aceite Vegetal
 ((SELECT id_ingreso FROM ingresos_insumos WHERE numero_ingreso = 'ING-2025-005'),
- (SELECT id_insumo FROM insumo WHERE codigo = 'INS-009'), 10.0000, 8.00, 80.00, NULL, 10.0000),
+ (SELECT id_insumo FROM insumo WHERE codigo = 'INS-009'), 10.0000, 8.00, 80.00, '2027-11-18', 10.0000),
 -- Esencia de Vainilla
 ((SELECT id_ingreso FROM ingresos_insumos WHERE numero_ingreso = 'ING-2025-005'),
  (SELECT id_insumo FROM insumo WHERE codigo = 'INS-010'), 0.5000, 80.00, 40.00, '2027-11-18', 0.5000);
+
+-- INGRESO 6: Compra adicional de Harina (Lote con vencimiento próximo para probar FEFO)
+INSERT INTO ingresos_insumos (numero_ingreso, numero_documento, tipo_documento, fecha_ingreso, fecha_documento, id_user, id_proveedor, observaciones, estado, monto_total) VALUES
+('ING-2025-006', 'F001-01000', 'FACTURA', '2025-11-27 12:00:00', '2025-11-27', 
+ (SELECT id_user FROM usuario WHERE email = 'admin@panaderia.com'),
+ (SELECT id_proveedor FROM proveedores WHERE ruc_dni = '20123456789'),
+ 'Compra adicional de harina - vence pronto', 'COMPLETADO', 140.00);
+
+INSERT INTO ingresos_insumos_detalle (id_ingreso, id_insumo, cantidad_ingresada, precio_unitario, subtotal, fecha_vencimiento, cantidad_restante) VALUES
+-- Harina - Lote 2 (vence en 1 mes - PRIORITARIO FEFO)
+((SELECT id_ingreso FROM ingresos_insumos WHERE numero_ingreso = 'ING-2025-006'),
+ (SELECT id_insumo FROM insumo WHERE codigo = 'INS-001'), 40.0000, 3.50, 140.00, '2025-12-27', 40.0000);
+
+-- =================================================================
+-- 8. PRODUCCIONES DE EJEMPLO
+-- =================================================================
+
+-- Producción de ejemplo para probar trazabilidad e historial
+INSERT INTO produccion (numero_produccion, id_receta, cantidad_batch, id_user, fecha_produccion, observaciones, anulado) VALUES
+('PROD-202511-1', (SELECT id_receta FROM recetas WHERE codigo_receta = 'REC-001'), 1, (SELECT id_user FROM usuario WHERE email = 'admin@panaderia.com'), '2025-11-28 10:00:00', 'Producción de ejemplo - 20 panes', false),
+('PROD-202511-2', (SELECT id_receta FROM recetas WHERE codigo_receta = 'REC-002'), 2, (SELECT id_user FROM usuario WHERE email = 'admin@panaderia.com'), '2025-11-28 14:00:00', 'Producción de ejemplo - 2 bizcochos', false);
 
 -- =================================================================
 -- 7. CONSULTAS DE PRUEBA PARA LOS ENDPOINTS
@@ -264,6 +285,32 @@ INSERT INTO ingresos_insumos_detalle (id_ingreso, id_insumo, cantidad_ingresada,
 -- JOIN insumo i ON mi.id_insumo = i.id_insumo
 -- WHERE mi.tipo_documento_origen = 'PRODUCCION'
 -- ORDER BY mi.fecha_movimiento DESC;
+
+-- ===== PRUEBAS DE CASOS DE BORDE =====
+
+-- ===== Prueba de Stock Insuficiente =====
+-- Intentar ejecutar producción de 100 bizcochos (excede stock de huevos)
+-- SELECT id_receta FROM recetas WHERE codigo_receta = 'REC-002';
+-- Body JSON:
+-- {
+--   "id_receta": {id_receta},
+--   "cantidad_batch": 100,
+--   "id_user": {id_user},
+--   "observaciones": "Prueba stock insuficiente"
+-- }
+-- Esperado: Error de validación, stock intacto
+
+-- ===== Prueba de Rollback de Transacción =====
+-- Para probar rollback, modificar temporalmente el código para forzar error
+-- (ej. en service.py, agregar raise Exception después de descontar algunos insumos)
+-- Ejecutar producción normal, verificar que si falla, stock se restaure
+-- Verificar con queries de stock antes/después
+
+-- ===== Verificar FEFO con múltiples lotes =====
+-- Después de agregar el lote de harina nuevo (ING-2025-006), verificar que se use primero
+-- SELECT id_insumo FROM insumo WHERE codigo = 'INS-001';
+-- GET /api/v1/ingresos_productos/lotes-fefo-total/{id_insumo}
+-- Esperado: Lote que vence 2025-12-27 primero, luego 2026-05-20
 
 -- =================================================================
 -- RESUMEN DE DATOS INSERTADOS

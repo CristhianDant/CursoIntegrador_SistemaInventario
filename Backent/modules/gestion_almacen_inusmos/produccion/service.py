@@ -200,6 +200,9 @@ class ProduccionService:
             # Commit de toda la transacción
             db.commit()
             
+            # Resetear contador de movimientos
+            self.repository._reset_contador_movimientos()
+            
             return ProduccionResponse(
                 success=True,
                 mensaje=f"Producción {numero_produccion} ejecutada correctamente. Se produjeron {cantidad_producida} unidades de {receta['nombre_receta']}",
@@ -213,6 +216,9 @@ class ProduccionService:
             )
             
         except Exception as e:
+            # Resetear contador de movimientos en caso de error
+            self.repository._reset_contador_movimientos()
+            
             # Revertir toda la transacción si hay error
             db.rollback()
             raise HTTPException(
@@ -286,8 +292,6 @@ class ProduccionService:
                 id_movimiento=mov.get("id_movimiento"),
                 numero_movimiento=mov.get("numero_movimiento"),
                 cantidad=mov.get("cantidad"),
-                stock_anterior=mov.get("stock_anterior"),
-                stock_nuevo=mov.get("stock_nuevo"),
                 fecha_movimiento=mov.get("fecha_movimiento")
             )
         

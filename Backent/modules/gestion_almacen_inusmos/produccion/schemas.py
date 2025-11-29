@@ -128,8 +128,6 @@ class MovimientoProductoTerminado(BaseModel):
     id_movimiento: Optional[int]
     numero_movimiento: Optional[str]
     cantidad: Optional[Decimal]
-    stock_anterior: Optional[Decimal]
-    stock_nuevo: Optional[Decimal]
     fecha_movimiento: Optional[datetime.datetime]
 
     class Config:
