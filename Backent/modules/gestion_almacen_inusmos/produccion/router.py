@@ -96,7 +96,7 @@ def get_historial_producciones(
         return api_response_bad_request(str(e))
 
 
-@router.get("/{id_produccion}/trazabilidad", response_model=TrazabilidadProduccionResponse)
+@router.get("/trazabilidad/{id_produccion}", response_model=TrazabilidadProduccionResponse)
 def get_trazabilidad_produccion(id_produccion: int, db: Session = Depends(get_db)):
     """
     Obtiene la trazabilidad completa de una producción específica.

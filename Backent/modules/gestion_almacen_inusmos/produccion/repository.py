@@ -348,7 +348,7 @@ class ProduccionRepository:
                 :numero_produccion, 
                 :id_receta, 
                 :cantidad_batch, 
-                NOW(), 
+                :fecha_produccion, 
                 :id_user, 
                 :observaciones, 
                 false
@@ -360,6 +360,7 @@ class ProduccionRepository:
             "numero_produccion": numero_produccion,
             "id_receta": id_receta,
             "cantidad_batch": float(cantidad_batch),
+            "fecha_produccion": datetime.datetime.now(),
             "id_user": id_user,
             "observaciones": observaciones
         })
@@ -470,7 +471,7 @@ class ProduccionRepository:
                 'PRODUCCION',
                 :cantidad,
                 0,
-                NOW(),
+                :fecha_movimiento,
                 :id_user,
                 :id_produccion,
                 'PRODUCCION',
@@ -484,6 +485,7 @@ class ProduccionRepository:
             "numero_movimiento": numero_movimiento,
             "id_producto": id_producto,
             "cantidad": float(cantidad),
+            "fecha_movimiento": datetime.datetime.now(),
             "id_user": id_user,
             "id_produccion": id_produccion,
             "observaciones": observaciones
@@ -693,3 +695,4 @@ class ProduccionRepository:
             ],
             "total_lotes_consumidos": len(movimientos)
         }
+
