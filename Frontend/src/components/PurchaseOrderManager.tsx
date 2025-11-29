@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from "./ui/button";
+import { useAuth } from "../context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "./ui/dialog";
 import { Input } from "./ui/input";
@@ -90,6 +91,9 @@ const availableIngredients = [
 ];
 
 export function PurchaseOrderManager() {
+  const { canWrite } = useAuth();
+  const canEditCompras = canWrite('COMPRAS');
+  
   const [orders, setOrders] = useState<OrdenDeCompra[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [insumos, setInsumos] = useState<Insumo[]>([]);
@@ -528,10 +532,12 @@ export function PurchaseOrderManager() {
           <h2 className="text-2xl font-bold">Órdenes de Compra</h2>
           <p className="text-muted-foreground">Gestiona las órdenes de compra a proveedores.</p>
         </div>
-        <Button onClick={openAddDialog}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva Orden
-        </Button>
+        {canEditCompras && (
+          <Button onClick={openAddDialog}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Orden
+          </Button>
+        )}
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -771,8 +777,12 @@ export function PurchaseOrderManager() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => { setSelectedOrderForInsumos(order); setIsViewInsumosOpen(true); }}><Search className="mr-2 h-4 w-4" />Ver Insumos</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleEdit(order)}><Edit className="mr-2 h-4 w-4" />Editar</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDelete(order.id_orden)} className="text-red-600"><Trash2 className="mr-2 h-4 w-4" />Anular</DropdownMenuItem>
+                    {canEditCompras && (
+                      <>
+                        <DropdownMenuItem onClick={() => handleEdit(order)}><Edit className="mr-2 h-4 w-4" />Editar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDelete(order.id_orden)} className="text-red-600"><Trash2 className="mr-2 h-4 w-4" />Anular</DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

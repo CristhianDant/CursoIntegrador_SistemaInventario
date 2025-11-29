@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, MoreVertical, Edit, Trash2, FileText, Calendar, User, Truck, ShoppingCart, Hash, DollarSign, Package } from 'lucide-react';
 import { Button } from './ui/button';
+import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
@@ -10,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { SearchableSelect } from './ui/searchable-select';
+import { toast } from 'sonner';
 import { API_BASE_URL } from '../constants';
 
 // --- CONFIGURACIÓN DE URL UNIFICADA ---
@@ -87,6 +90,9 @@ interface PurchaseOrderDetailed {
 }
 
 export function SupplyEntryManager() {
+  const { canWrite } = useAuth();
+  const canEditInventario = canWrite('INVENTARIO');
+  
   const [entries, setEntries] = useState<SupplyEntry[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderDetailed[]>([]);
@@ -103,7 +109,6 @@ export function SupplyEntryManager() {
   });
 
   const loadAllData = async (includeArchivedOrders: boolean = false) => {
-    console.log('=== INICIANDO loadAllData ===');
     try {
       const [suppliersRes, purchaseOrdersRes, insumosRes, entriesRes] = await Promise.all([
         fetch(`${API_BASE_URL}/v1/proveedores`),
@@ -124,12 +129,9 @@ export function SupplyEntryManager() {
       let ordersList: PurchaseOrderDetailed[] = [];
       if (purchaseOrdersRes.ok) {
         const ordersData = await purchaseOrdersRes.json();
-        console.log('=== ORDENES_COMPRA RAW ===', ordersData);
         ordersList = Array.isArray(ordersData) ? ordersData : (ordersData.data || []);
-        console.log('=== ORDENES_COMPRA PARSED ===', ordersList);
         setPurchaseOrders(ordersList);
       } else {
-        console.error('Error cargando órdenes de compra:', purchaseOrdersRes.status);
         setPurchaseOrders([]);
       }
 
@@ -229,7 +231,7 @@ export function SupplyEntryManager() {
     const orden = purchaseOrders.find(o => o.id_orden === Number(orderId));
     
     if (!orden) {
-      console.error('Orden de compra no encontrada');
+      toast.error('Orden de compra no encontrada');
       return;
     }
 
@@ -251,8 +253,6 @@ export function SupplyEntryManager() {
 
     const totalMonto = detallesMapados.reduce((acc, d) => acc + (d.subtotal || 0), 0);
 
-    console.log('Orden seleccionada:', { orden, proveedor, detalles: detallesMapados });
-
     // Actualizar el formulario con los datos de la orden
     setFormData(prev => ({
       ...prev,
@@ -268,12 +268,32 @@ export function SupplyEntryManager() {
     const url = editingEntry ? `${SUPPLY_ENTRY_API_URL}/${editingEntry.id_ingreso}` : SUPPLY_ENTRY_API_URL;
     const method = editingEntry ? 'PUT' : 'POST';
 
+    // Limpiar los detalles para enviar solo campos requeridos por el backend
+    const detallesLimpios = (formData.detalles || []).map(d => ({
+      id_insumo: Number(d.id_insumo),
+      cantidad_ordenada: Number(d.cantidad_ordenada) || 0,
+      cantidad_ingresada: Number(d.cantidad_ingresada),
+      precio_unitario: Number(d.precio_unitario),
+      subtotal: Number(d.subtotal),
+      fecha_vencimiento: d.fecha_vencimiento ? new Date(d.fecha_vencimiento).toISOString() : null,
+    }));
+
     // Asegurarse de que los campos de fecha tengan el formato correcto
     const body = {
-        ...formData,
+        numero_ingreso: formData.numero_ingreso,
+        id_orden_compra: formData.id_orden_compra || null,
+        numero_documento: formData.numero_documento,
+        tipo_documento: formData.tipo_documento,
         fecha_ingreso: formData.fecha_ingreso ? new Date(formData.fecha_ingreso).toISOString() : new Date().toISOString(),
         fecha_documento: formData.fecha_documento ? new Date(formData.fecha_documento).toISOString() : new Date().toISOString(),
+        fecha_registro: new Date().toISOString(),
         id_user: 1, // Hardcodeado por ahora
+        id_proveedor: formData.id_proveedor,
+        observaciones: formData.observaciones || null,
+        estado: formData.estado || "COMPLETADO",
+        monto_total: formData.monto_total || 0,
+        anulado: false,
+        detalles: detallesLimpios,
     };
 
     try {
@@ -284,32 +304,26 @@ export function SupplyEntryManager() {
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Error al guardar el ingreso');
+        throw new Error(error.data || error.message || 'Error al guardar el ingreso');
       }
-      await loadAllData(false); // Cargar solo órdenes activas después de guardar
+      toast.success(editingEntry ? 'Ingreso actualizado correctamente' : 'Ingreso creado correctamente');
+      await loadAllData(false);
       setIsDialogOpen(false);
     } catch (error) {
-      console.error("Submit error:", error);
-      alert(`Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      toast.error(error instanceof Error ? error.message : 'Error desconocido al guardar el ingreso');
     }
   };
 
   const handleEdit = async (entry: SupplyEntry) => {
-    console.log('=== EDIT: Entry ===', entry);
-    console.log('=== EDIT: id_orden_compra ===', entry.id_orden_compra);
-    
     setEditingEntry(entry);
     
     // Si la orden no está en la lista actual (porque está anulada), cargar todas las órdenes
     let ordenCompra = purchaseOrders.find(o => o.id_orden === entry.id_orden_compra);
     if (!ordenCompra && entry.id_orden_compra) {
-      console.log('⚠️ ORDEN ANULADA DETECTADA - Recargando con órdenes anuladas');
       await loadAllData(true); // true = incluir órdenes anuladas
       // Buscar de nuevo después de recargar
       ordenCompra = purchaseOrders.find(o => o.id_orden === entry.id_orden_compra);
     }
-    
-    console.log('=== EDIT: ordenCompra encontrada ===', ordenCompra);
     
     // Mapear correctamente los detalles con los insumos actuales
     const detallesConNombres = (entry.detalles || []).map(detail => {
@@ -319,7 +333,6 @@ export function SupplyEntryManager() {
       let cantidadOrdenada = detail.cantidad_ordenada;
       if (!cantidadOrdenada && ordenCompra) {
         const detalleOrden = ordenCompra.detalles?.find(d => d.id_insumo === detail.id_insumo);
-        console.log(`Detalle ${detail.id_insumo} en orden:`, detalleOrden);
         cantidadOrdenada = detalleOrden?.cantidad || detail.cantidad_ingresada || 0;
       }
       
@@ -329,8 +342,6 @@ export function SupplyEntryManager() {
         nombre_insumo: insumo?.nombre_insumo || insumo?.nombre || insumo?.name || detail.nombre_insumo || 'Insumo desconocido'
       };
     });
-    
-    console.log('=== EDIT: detallesConNombres ===', detallesConNombres);
     
     const supplier = suppliers.find(s => (s.id_proveedor || s.id) === entry.id_proveedor);
     
@@ -348,9 +359,10 @@ export function SupplyEntryManager() {
       // Lógica de anulación (puede ser un PUT o un DELETE)
       const response = await fetch(`${SUPPLY_ENTRY_API_URL}/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Error al anular el ingreso');
-      await loadAllData(false); // Cargar solo órdenes activas después de eliminar
+      toast.success('Ingreso anulado correctamente');
+      await loadAllData(false);
     } catch (error) {
-      console.error("Delete error:", error);
+      toast.error('Error al anular el ingreso');
     }
   };
 
@@ -381,7 +393,9 @@ export function SupplyEntryManager() {
           <h2 className="text-2xl font-bold">Gestión de Ingreso de Insumos</h2>
           <p className="text-muted-foreground">Registra las entradas de insumos desde proveedores.</p>
         </div>
-        <Button onClick={openNewDialog}><Plus className="mr-2 h-4 w-4" /> Nuevo Ingreso</Button>
+        {canEditInventario && (
+          <Button onClick={openNewDialog}><Plus className="mr-2 h-4 w-4" /> Nuevo Ingreso</Button>
+        )}
       </div>
 
       <Card>
@@ -414,8 +428,12 @@ export function SupplyEntryManager() {
                     <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleEdit(entry)}><Edit className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDelete(entry.id_ingreso)} className="text-red-500"><Trash2 className="mr-2 h-4 w-4" /> Anular</DropdownMenuItem>
+                    {canEditInventario && (
+                      <>
+                        <DropdownMenuItem onClick={() => handleEdit(entry)}><Edit className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDelete(entry.id_ingreso)} className="text-red-500"><Trash2 className="mr-2 h-4 w-4" /> Anular</DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -536,19 +554,17 @@ export function SupplyEntryManager() {
                     {/* Fila 1: Insumo */}
                     <div>
                       <label className="text-sm font-medium block mb-1">Insumo</label>
-                      <Select 
-                        onValueChange={(value: string) => handleDetailChange(index, 'id_insumo', value)} 
+                      <SearchableSelect
+                        options={insumos.map((i: Insumo) => ({
+                          value: String(i.id_insumo || i.id),
+                          label: i.nombre_insumo || i.nombre || i.name || 'Sin nombre'
+                        }))}
                         value={String(detail.id_insumo || '')}
-                      >
-                        <SelectTrigger><SelectValue placeholder="Selecciona insumo" /></SelectTrigger>
-                        <SelectContent>
-                          {insumos.map((i: Insumo) => (
-                            <SelectItem key={i.id_insumo || i.id} value={String(i.id_insumo || i.id)}>
-                              {i.nombre_insumo || i.nombre || i.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onValueChange={(value: string) => handleDetailChange(index, 'id_insumo', value)}
+                        placeholder="Buscar insumo..."
+                        searchPlaceholder="Escriba para filtrar..."
+                        emptyMessage="No se encontró el insumo"
+                      />
                     </div>
                     
                     {/* Fila 2: Cantidades y Precio */}

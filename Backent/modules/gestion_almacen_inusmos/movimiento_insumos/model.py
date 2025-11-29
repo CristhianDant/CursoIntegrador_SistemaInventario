@@ -12,7 +12,7 @@ class MovimientoInsumo(Base):
     id_movimiento = Column(BigInteger, primary_key=True, autoincrement=True)
     numero_movimiento = Column(String(50), unique=True, nullable=False)
     id_insumo = Column(BigInteger, ForeignKey('insumo.id_insumo'), nullable=False)
-    id_lote = Column(BigInteger, ForeignKey('ingresos_productos_detalle.id_ingreso_detalle'))
+    id_lote = Column(BigInteger, ForeignKey('ingresos_insumos_detalle.id_ingreso_detalle'))
     tipo_movimiento = Column(String(20), nullable=False)
     motivo = Column(String(100), nullable=False)
     cantidad = Column(DECIMAL(12, 4), nullable=False)

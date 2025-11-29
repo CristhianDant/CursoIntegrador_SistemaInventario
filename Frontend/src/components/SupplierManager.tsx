@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Search, Edit, Trash2, Phone, Mail, MapPin, Calendar, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "./ui/button";
+import { useAuth } from "../context/AuthContext";
 import { Input } from "./ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
@@ -39,6 +40,9 @@ const PROVEEDORES_API_URL = `${API_BASE_URL}/v1/proveedores`;
 
 
 export function SupplierManager() {
+  const { canWrite } = useAuth();
+  const canEditProveedores = canWrite('PROVEEDORES');
+  
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -233,12 +237,14 @@ export function SupplierManager() {
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-                <Button onClick={openAddDialog}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nuevo Proveedor
-                </Button>
-            </DialogTrigger>
+            {canEditProveedores && (
+              <DialogTrigger asChild>
+                  <Button onClick={openAddDialog}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nuevo Proveedor
+                  </Button>
+              </DialogTrigger>
+            )}
             
             <DialogContent className="max-w-xl">
               <DialogHeader>
@@ -428,23 +434,25 @@ export function SupplierManager() {
                     </TableCell>
                     
                     <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(proveedor)}
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(proveedor.id_proveedor)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+                      {canEditProveedores && (
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(proveedor)}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(proveedor.id_proveedor)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

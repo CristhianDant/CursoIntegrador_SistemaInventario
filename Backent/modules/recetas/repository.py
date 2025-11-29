@@ -1,15 +1,15 @@
 from typing import List, Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from modules.recetas.model import Receta, RecetaDetalle
 from modules.recetas.schemas import RecetaCreate, RecetaUpdate
 from modules.recetas.repository_interface import RecetaRepositoryInterface
 
 class RecetaRepository(RecetaRepositoryInterface):
     def get_all(self, db: Session) -> List[Receta]:
-        return db.query(Receta).filter(Receta.anulado == False).all()
+        return db.query(Receta).options(joinedload(Receta.detalles)).filter(Receta.anulado == False).all()
 
     def get_by_id(self, db: Session, receta_id: int) -> Optional[Receta]:
-        return db.query(Receta).filter(Receta.id_receta == receta_id, Receta.anulado == False).first()
+        return db.query(Receta).options(joinedload(Receta.detalles)).filter(Receta.id_receta == receta_id, Receta.anulado == False).first()
 
     def create(self, db: Session, receta: RecetaCreate) -> Receta:
         db_receta = Receta(

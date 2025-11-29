@@ -4,16 +4,12 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Alert, AlertDescription } from "./ui/alert";
-import { API_BASE_URL } from "../constants";
+import { useAuth } from "../context/AuthContext";
 // @ts-ignore: SVG module is handled by the bundler (svgr) and may not have TypeScript declarations
 import MiLogo from './Img/Pasteleria.svg?react';
 
-
-interface LoginFormProps {
-  onLogin: (email: string) => void;
-}
-
-export function LoginForm({ onLogin }: LoginFormProps) {
+export function LoginForm() {
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -24,32 +20,13 @@ export function LoginForm({ onLogin }: LoginFormProps) {
     setError("");
     setLoading(true);
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/v1/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        onLogin(email); // o data.user.email si el backend devuelve info
-      } else {
-        const errorData = await response.json();
-        console.error('Error en login:', errorData);
-        setError(errorData.message || 'Error en el login');
-      }
-    } catch (err) {
-      console.error('Error de conexión con el servidor:', err);
-      setError('Error de conexión con el servidor');
-    } finally {
-      setLoading(false);
+    const result = await login(email, password);
+    
+    if (!result.success) {
+      setError(result.error || 'Error en el login');
     }
+    
+    setLoading(false);
   };
 
   return (

@@ -27,9 +27,12 @@ def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
 @router.post("/", response_model=UsuarioResponseConPersonal, status_code=201)
 def create_user(user: UsuarioCreate, db: Session = Depends(get_db)):
     try:
-        new_user_orm = service.create(db, user)
+        new_user_orm, email_info = service.create(db, user)
         new_user_response = UsuarioResponseConPersonal.model_validate(new_user_orm)
-        return api_response_ok(new_user_response)
+        return api_response_ok({
+            "usuario": new_user_response.model_dump(),
+            "email": email_info
+        })
     except ValueError as e:
         return api_response_bad_request(str(e))
     except Exception as e:

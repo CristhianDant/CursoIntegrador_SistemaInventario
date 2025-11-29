@@ -57,3 +57,7 @@ class InsumoService:
         if db_insumo:
             return Insumo.model_validate(db_insumo)
         return None
+
+    def get_ultimos_precios(self) -> dict:
+        """Obtiene el último precio de compra de cada insumo."""
+        return self.repository.get_ultimos_precios()

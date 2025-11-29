@@ -26,6 +26,18 @@ def read_insumos(skip: int = 0, limit: int = 100, service: InsumoService = Depen
     insumos = service.get_insumos(skip, limit)
     return api_response_ok(insumos)
 
+@router.get("/precios/ultimos")
+def get_ultimos_precios(service: InsumoService = Depends(get_insumo_service)):
+    """
+    Obtiene el último precio de compra de cada insumo.
+    Retorna un diccionario {id_insumo: precio_unitario}
+    """
+    try:
+        precios = service.get_ultimos_precios()
+        return api_response_ok(precios)
+    except Exception as e:
+        return api_response_not_found(f"Error al obtener precios: {str(e)}")
+
 @router.get("/{insumo_id}", response_model=Insumo)
 def read_insumo(insumo_id: int, service: InsumoService = Depends(get_insumo_service)):
     db_insumo = service.get_insumo(insumo_id)

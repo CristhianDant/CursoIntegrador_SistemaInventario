@@ -21,11 +21,16 @@ class UsuarioRepository(UsuarioRepositoryInterfaz):
         ).filter(Usuario.id_user == user_id, Usuario.anulado == False).first()
 
 
-    def get_by_email(self, db: Session, email: str) -> Optional[Usuario]:
-        return db.query(Usuario).options(
+    def get_by_email(self, db: Session, email: str, solo_activos: bool = True) -> Optional[Usuario]:
+        query = db.query(Usuario).options(
             joinedload(Usuario.roles),
             joinedload(Usuario.personal)
-        ).filter(Usuario.email == email).first()
+        ).filter(Usuario.email == email)
+        
+        if solo_activos:
+            query = query.filter(Usuario.anulado == False)
+        
+        return query.first()
 
     def create(self, db: Session, user: UsuarioCreate) -> Usuario:
         user_data = user.model_dump(exclude={'lista_roles', 'personal'})

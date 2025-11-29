@@ -12,10 +12,13 @@ import {
   User,
   Building,
   Wrench,
-  Truck
+  Truck,
+  Shield
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "./ui/utils";
+import { useAuth } from "../context/AuthContext";
+import { Badge } from "./ui/badge";
 // @ts-ignore: SVG module is handled by the bundler (svgr) and may not have TypeScript declarations
 import MiLogo from './Img/Pasteleria.svg?react';
 
@@ -27,23 +30,36 @@ interface LayoutProps {
   username: string;
 }
 
+// Cada item de menú tiene un módulo de permisos requerido
 const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: Home },
-  { id: 'inventory', label: 'Insumos', icon: Package },
-  { id: 'recipes', label: 'Recetas', icon: ChefHat },
-  { id: 'purchase-orders', label: 'Órdenes de Compra', icon: Wrench },
-  { id: 'supply-entry', label: 'Ingreso de Insumos', icon: Truck },
-  { id: 'products', label: 'Productos', icon: Package },
-  { id: 'suppliers', label: 'Proveedores', icon: Building },
-  { id: 'users', label: 'Usuarios', icon: User },
-  { id: 'alerts', label: 'Alertas', icon: AlertTriangle },
-  { id: 'reports', label: 'Reportes', icon: BarChart3 },
-  { id: 'settings', label: 'Configuración', icon: Settings },
+  { id: 'dashboard', label: 'Dashboard', icon: Home, modulo: 'DASHBOARD' },
+  { id: 'inventory', label: 'Insumos', icon: Package, modulo: 'INSUMOS' },
+  { id: 'recipes', label: 'Recetas', icon: ChefHat, modulo: 'RECETAS' },
+  { id: 'purchase-orders', label: 'Órdenes de Compra', icon: Wrench, modulo: 'COMPRAS' },
+  { id: 'supply-entry', label: 'Ingreso de Insumos', icon: Truck, modulo: 'INVENTARIO' },
+  { id: 'products', label: 'Productos', icon: Package, modulo: 'PRODUCTOS' },
+  { id: 'suppliers', label: 'Proveedores', icon: Building, modulo: 'PROVEEDORES' },
+  { id: 'users', label: 'Usuarios', icon: User, modulo: 'USUARIOS' },
+  { id: 'alerts', label: 'Alertas', icon: AlertTriangle, modulo: 'INVENTARIO' },
+  { id: 'reports', label: 'Reportes', icon: BarChart3, modulo: 'REPORTES' },
+  { id: 'settings', label: 'Configuración', icon: Settings, modulo: 'CONFIGURACION' },
 ];
 
 export function Layout({ children, currentPage, onPageChange, onLogout, username }: LayoutProps) {
+  const { isAdmin, canRead, user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [companyName, setCompanyName] = useState('Sistema de Inventario');
+
+  // Filtrar menú según permisos del usuario
+  // Admin ve todo, otros usuarios solo ven módulos donde tienen permiso (leer o escribir)
+  const visibleMenuItems = menuItems.filter(item => {
+    // Dashboard siempre visible para todos
+    if (item.modulo === 'DASHBOARD') return true;
+    // Admin ve todo
+    if (isAdmin()) return true;
+    // Otros usuarios solo ven módulos donde tienen permiso
+    return canRead(item.modulo);
+  });
 
   // Cargar nombre de empresa desde localStorage
   useEffect(() => {
@@ -104,7 +120,7 @@ export function Layout({ children, currentPage, onPageChange, onLogout, username
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
-          {menuItems.map((item) => {
+          {visibleMenuItems.map((item) => {
             const Icon = item.icon;
             return (
               <button
@@ -129,9 +145,22 @@ export function Layout({ children, currentPage, onPageChange, onLogout, username
 
         <div className="p-4 border-t">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">{username}</p>
-              <p className="text-xs text-gray-500">Administrador</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">{username}</p>
+              <div className="flex items-center gap-1 flex-wrap">
+                {isAdmin() ? (
+                  <Badge variant="default" className="text-xs bg-orange-500 hover:bg-orange-600">
+                    <Shield className="h-3 w-3 mr-1" />
+                    Admin
+                  </Badge>
+                ) : (
+                  user?.roles?.slice(0, 2).map(role => (
+                    <Badge key={role.id_rol} variant="secondary" className="text-xs">
+                      {role.nombre_rol}
+                    </Badge>
+                  ))
+                )}
+              </div>
             </div>
             <Button
               variant="ghost"

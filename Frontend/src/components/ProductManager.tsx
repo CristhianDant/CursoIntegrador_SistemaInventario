@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Plus, Search, Edit, Trash2, Package, TrendingUp, Calendar, DollarSign, Percent, Gift, AlertTriangle } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -11,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Textarea } from "./ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { API_BASE_URL } from "../constants";
+import { useAuth } from "../context/AuthContext";
 
 // Interfaces
 interface Recipe {
@@ -67,33 +69,25 @@ interface FinishedProduct {
     movements: ProductMovement[];
 }
 
-// En C:/Users/Asus/OneDrive/Documentos/repo_Integrador/.../ProductManager.tsx
-
 interface FormData {
-    // Usamos 'id' en el Formulario, pero mapea a 'id_producto' en la API
+    // ID del producto (para edición)
     id?: number; 
     
-    // Usamos camelCase para los campos de formulario:
-    productCode?: string; // Mapea a codigo_producto
-    name: string; // Mapea a nombre
-    description: string; // Mapea a descripcion
-    unitOfMeasure: string; // Mapea a unidad_medida
-    minStock: number; // Mapea a stock_minimo
-    sellingPrice: number; // Mapea a precio_venta
-    shelfLifeDays: number | null; // Mapea a vida_util_dias
+    // Campos que se envían a la API
+    codigo_producto?: string;
+    name: string;
+    description: string;
+    unitOfMeasure: string;
+    minStock: number;
+    sellingPrice: number;
+    vida_util_dias: number | null;
     
-    // Campos del formulario/UI
-    unitCost?: number;
-    maxStock?: number;
+    // Campos auxiliares del formulario
     recipeId?: number | null;
-    currentStock?: number; // Aunque solo para visualización, lo definimos
     anulado?: boolean;
-    category?: string;
-    productionDate?: string;
-    expiryDate?: string;
 }
 
-// Mock data de recetas disponibles
+// Mock data de recetas disponibles (fallback si la API falla)
 const availableRecipes = [
   { id_receta: 1, nombre_receta: "Pastel de Chocolate Clásico", costo_estimado: 0.71 },
   { id_receta: 2, nombre_receta: "Galletas de Mantequilla", costo_estimado: 0.08 },
@@ -185,10 +179,12 @@ const isComplementaryCategory = (category1: string, category2: string): boolean 
 };
 
 export function ProductManager() {
+  const { canWrite } = useAuth();
+  const canEditProducts = canWrite('PRODUCTOS');
+  
   const [products, setProducts] = useState<FinishedProduct[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>(availableRecipes); // Estado para recetas cargadas de la API
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isMovementDialogOpen, setIsMovementDialogOpen] = useState(false);
@@ -199,9 +195,6 @@ export function ProductManager() {
   const [movementData, setMovementData] = useState<Partial<ProductMovement>>({});
   const [promotionSuggestions, setPromotionSuggestions] = useState<PromotionSuggestion[]>([]);
   const [selectedPromotion, setSelectedPromotion] = useState<PromotionSuggestion | null>(null);
-
-  
-  const categories = ["Pasteles", "Galletas", "Panes", "Postres", "Decoraciones"];
 
  const fetchProducts = async () => {
     try {
@@ -298,22 +291,22 @@ useEffect(() => {
     setPromotionSuggestions(generatePromotionSuggestions(products));
   }, [products]);
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.recipeName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
-    const matchesStatus = selectedStatus === "all" || product.status === selectedStatus;
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Disponible': return 'bg-green-100 text-green-800';
-      case 'Agotado': return 'bg-red-100 text-red-800';
-      case 'Por Vencer': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  // Función para calcular el estado de un producto
+  const getProductStatus = (product: FinishedProduct) => {
+    if (product.stock_actual <= 0) return 'Agotado';
+    if (product.stock_actual <= product.stock_minimo) return 'Stock Bajo';
+    return 'Disponible';
   };
+
+  const filteredProducts = products.filter(product => {
+    const productName = product.nombre || '';
+    const productCode = product.codigo_producto || '';
+    const matchesSearch = productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         productCode.toLowerCase().includes(searchTerm.toLowerCase());
+    const productStatus = getProductStatus(product);
+    const matchesStatus = selectedStatus === "all" || productStatus === selectedStatus;
+    return matchesSearch && matchesStatus;
+  });
 
   const generateBatchNumber = (recipeId: number) => {
     const today = new Date();
@@ -334,6 +327,8 @@ useEffect(() => {
         
         // Mapeo: formData (UI/camelCase) -> updatedData (API/snake_case)
         const updatedData = {
+            // codigo_producto es requerido por el schema
+            codigo_producto: editingProduct.codigo_producto,
             // Usamos '!' para indicar que estos campos deben existir al enviar el formulario.
             nombre: formData.name!, 
             descripcion: formData.description || "",
@@ -358,10 +353,12 @@ useEffect(() => {
             }
 
             await response.json(); 
-            fetchProducts(); 
+            await fetchProducts(); 
+            toast.success("Producto actualizado correctamente");
 
         } catch (error) {
             console.error("Fallo la actualización del producto. El error es:", error);
+            toast.error("Error al actualizar el producto");
         }
         
     } else { // Lógica de Creación (POST)
@@ -426,37 +423,56 @@ const handleMovementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!selectedProduct || !movementData.quantity || !movementData.date) {
-        console.error("Datos incompletos para el movimiento");
+        toast.error("Datos incompletos para el movimiento");
         return;
     }
 
-    // Aquí se implementaría la lógica para registrar movimientos en la API
-    // Por ahora solo actualiza el estado local
-    const updatedProducts = products.map(p => {
-        if (p.id_producto === selectedProduct.id_producto) {
-            const newStock = movementData.type === 'venta' 
-                ? p.stock_actual - (movementData.quantity || 0)
-                : p.stock_actual + (movementData.quantity || 0);
-            
-            return {
-                ...p,
-                stock_actual: Math.max(0, newStock),
-                movements: [
-                    ...p.movements,
-                    {
-                        id: p.movements.length + 1,
-                        type: movementData.type as 'produccion' | 'venta' | 'merma',
-                        quantity: movementData.quantity || 0,
-                        date: movementData.date || new Date().toISOString().split('T')[0],
-                        notes: movementData.notes
-                    }
-                ]
-            };
+    // Generar número de movimiento único
+    const generateMovementNumber = () => {
+        const now = new Date();
+        const prefix = movementData.type === 'produccion' ? 'PROD' : movementData.type === 'venta' ? 'VTA' : 'MRM';
+        return `${prefix}-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+    };
+
+    // Mapear tipo de movimiento del frontend al backend
+    const tipoMovimientoMap: { [key: string]: string } = {
+        'produccion': 'ENTRADA',
+        'venta': 'SALIDA',
+        'merma': 'SALIDA'
+    };
+
+    const movimientoData = {
+        numero_movimiento: generateMovementNumber(),
+        id_producto: selectedProduct.id_producto,
+        tipo_movimiento: tipoMovimientoMap[movementData.type || 'produccion'],
+        motivo: movementData.type === 'produccion' ? 'Producción' : movementData.type === 'venta' ? 'Venta' : 'Merma',
+        cantidad: movementData.quantity,
+        precio_venta: movementData.type === 'venta' ? selectedProduct.precio_venta : 0,
+        id_user: 1, // TODO: Obtener del usuario logueado
+        observaciones: movementData.notes || null
+    };
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/v1/movimientos_productos_terminados/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(movimientoData),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.data || 'Error al registrar el movimiento');
         }
-        return p;
-    }) as FinishedProduct[];
+
+        await response.json();
+        await fetchProducts(); // Recargar productos para ver el stock actualizado
+        toast.success(`${movementData.type === 'produccion' ? 'Producción' : 'Venta'} registrada correctamente`);
+        
+    } catch (error: any) {
+        console.error("Fallo el registro del movimiento:", error);
+        toast.error(error.message || "Error al registrar el movimiento");
+    }
     
-    setProducts(updatedProducts);
     setIsMovementDialogOpen(false);
     setMovementData({});
     setSelectedProduct(null);
@@ -469,18 +485,13 @@ const handleEdit = (product: FinishedProduct) => {
   setFormData({
     // Propiedades API/DB (product.)     = Propiedades Formulario (setFormData)
     name: product.nombre, // FIX: Usa product.nombre
-    description: product.descripcion, // FIX: Usa product.descripcion
-    currentStock: product.stock_actual, // FIX: Usa product.stock_actual
-    minStock: product.stock_minimo, // FIX: Usa product.stock_minimo
-    sellingPrice: product.precio_venta, // FIX: Usa product.precio_venta
-    unitOfMeasure: product.unidad_medida, // FIX: Usa product.unidad_medida
+    description: product.descripcion,
+    minStock: product.stock_minimo,
+    sellingPrice: product.precio_venta,
+    unitOfMeasure: product.unidad_medida,
     vida_util_dias: product.vida_util_dias, 
     anulado: product.anulado, 
     codigo_producto: product.codigo_producto,
-
-    // Campos de la UI que no vienen directamente de la API (Mantener en camelCase)
-    unitCost: product.unitCost, 
-    maxStock: product.maxStock, 
     recipeId: product.recipeId, 
   });
   setIsDialogOpen(true);
@@ -493,9 +504,9 @@ const handleEdit = (product: FinishedProduct) => {
   const openAddDialog = () => {
     setEditingProduct(null);
     setFormData({
-      productionDate: new Date().toISOString().split('T')[0],
       minStock: 5,
-      maxStock: 20
+      unitOfMeasure: 'UNIDAD',
+      vida_util_dias: 30
     });
     setIsDialogOpen(true);
   };
@@ -532,12 +543,12 @@ const handleEdit = (product: FinishedProduct) => {
     }
   };
 
-  // Estadísticas
+  // Estadísticas basadas en datos reales
   const stats = {
     total: products.length,
-    available: products.filter(p => p.status === 'Disponible').length,
-    outOfStock: products.filter(p => p.status === 'Agotado').length,
-    expiring: products.filter(p => p.status === 'Por Vencer').length,
+    available: products.filter(p => p.stock_actual > p.stock_minimo).length,
+    outOfStock: products.filter(p => p.stock_actual <= 0).length,
+    lowStock: products.filter(p => p.stock_actual > 0 && p.stock_actual <= p.stock_minimo).length,
     totalValue: products.reduce((sum, p) => sum + (p.stock_actual * p.precio_venta), 0),
     activeSuggestions: promotionSuggestions.filter(s => !s.isActive).length,
     potentialSavings: promotionSuggestions.reduce((sum, s) => sum + s.potentialSavings, 0)
@@ -562,10 +573,12 @@ const handleEdit = (product: FinishedProduct) => {
               </Badge>
             )}
           </Button>
-          <Button onClick={openAddDialog}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Producto
-          </Button>
+          {canEditProducts && (
+            <Button onClick={openAddDialog}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Producto
+            </Button>
+          )}
         </div>
       </div>
 
@@ -611,10 +624,10 @@ const handleEdit = (product: FinishedProduct) => {
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Por Vencer</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.expiring}</p>
+                <p className="text-sm text-muted-foreground">Stock Bajo</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.lowStock}</p>
               </div>
-              <Calendar className="h-5 w-5 text-yellow-500" />
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
             </div>
           </CardContent>
         </Card>
@@ -658,18 +671,6 @@ const handleEdit = (product: FinishedProduct) => {
               />
             </div>
             
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Categoría" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las categorías</SelectItem>
-                {categories.map(category => (
-                  <SelectItem key={category} value={category}>{category}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Estado" />
@@ -677,8 +678,8 @@ const handleEdit = (product: FinishedProduct) => {
               <SelectContent>
                 <SelectItem value="all">Todos los estados</SelectItem>
                 <SelectItem value="Disponible">Disponible</SelectItem>
+                <SelectItem value="Stock Bajo">Stock Bajo</SelectItem>
                 <SelectItem value="Agotado">Agotado</SelectItem>
-                <SelectItem value="Por Vencer">Por Vencer</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -698,65 +699,57 @@ const handleEdit = (product: FinishedProduct) => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Código</TableHead>
                   <TableHead>Producto</TableHead>
-                  <TableHead>Receta Base</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead>Costo/Precio</TableHead>
-                  <TableHead>Margen</TableHead>
-                  <TableHead>Vencimiento</TableHead>
+                  <TableHead>Precio Venta</TableHead>
+                  <TableHead>Vida Útil</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id_producto}> {/* CORRECCIÓN: product.id -> product.id_producto */}
+                {filteredProducts.map((product) => {
+                  // Calcular estado dinámicamente
+                  const getProductStatus = () => {
+                    if (product.stock_actual <= 0) return 'Agotado';
+                    if (product.stock_actual <= product.stock_minimo) return 'Stock Bajo';
+                    return 'Disponible';
+                  };
+                  const status = getProductStatus();
+                  const statusColor = status === 'Disponible' ? 'bg-green-100 text-green-800' 
+                    : status === 'Agotado' ? 'bg-red-100 text-red-800' 
+                    : 'bg-yellow-100 text-yellow-800';
+                  
+                  return (
+                  <TableRow key={product.id_producto}>
+                    <TableCell>
+                      <span className="font-mono text-sm">{product.codigo_producto}</span>
+                    </TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{product.nombre}</div> {/* CORRECCIÓN: product.name -> product.nombre */}
-                        <div className="text-sm text-muted-foreground">{product.codigo_producto}</div> {/* CORRECCIÓN: product.batchNumber -> product.codigo_producto */}
+                        <div className="font-medium">{product.nombre}</div>
+                        <div className="text-sm text-muted-foreground">{product.descripcion?.substring(0, 40)}{product.descripcion?.length > 40 ? '...' : ''}</div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{product.recipeName}</div>
-                        <div className="text-sm text-muted-foreground">{product.category}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{product.stock_actual} unidades</div> {/* CORRECCIÓN: product.currentStock -> product.stock_actual */}
+                        <div className="font-medium">{product.stock_actual} {product.unidad_medida?.toLowerCase()}</div>
                         <div className="text-xs text-muted-foreground">
-                          Min: {product.stock_minimo} | Max: {product.maxStock} {/* CORRECCIÓN: product.minStock -> product.stock_minimo */}
+                          Mínimo: {product.stock_minimo}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={getStatusColor(product.status)}>
-                        {product.status}
+                      <Badge className={statusColor}>
+                        {status}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <div className="text-sm">Costo: ${product.unitCost.toFixed(2)}</div>
-                        <div className="font-medium">Precio: ${product.precio_venta.toFixed(2)}</div> {/* CORRECCIÓN: product.sellingPrice -> product.precio_venta */}
-                      </div>
+                      <span className="font-medium text-green-600">S/ {product.precio_venta.toFixed(2)}</span>
                     </TableCell>
                     <TableCell>
-                      <span className={`font-medium ${
-                        product.profitMargin > 100 ? 'text-green-600' : 
-                        product.profitMargin > 50 ? 'text-yellow-600' : 'text-red-600'
-                      }`}>
-                        {product.profitMargin.toFixed(1)}%
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div>{new Date(product.expiryDate).toLocaleDateString()}</div>
-                        <div className="text-xs text-muted-foreground">
-                          Prod: {new Date(product.productionDate).toLocaleDateString()}
-                        </div>
-                      </div>
+                      <span className="text-sm">{product.vida_util_dias ? `${product.vida_util_dias} días` : '-'}</span>
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-1">
@@ -777,17 +770,21 @@ const handleEdit = (product: FinishedProduct) => {
                         >
                           <DollarSign className="h-3 w-3" />
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(product)}
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
+                        {canEditProducts && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(product)}
+                            title="Editar"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -809,9 +806,11 @@ const handleEdit = (product: FinishedProduct) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Nombre del Producto</Label>
+                <Label htmlFor="productName">Nombre del Producto</Label>
                 <Input
-                  id="name"
+                  id="productName"
+                  name="productName"
+                  autoComplete="off"
                   placeholder="Ej: Pastel de Chocolate Premium"
                   value={formData.name || ""}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
@@ -820,26 +819,26 @@ const handleEdit = (product: FinishedProduct) => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="recipeId">Receta Base</Label>
+                <Label htmlFor="recipeId">Receta Base (opcional)</Label>
                 <Select 
-                  value={formData.recipeId?.toString() || ""} 
+                  value={formData.recipeId?.toString() || "none"} 
                   onValueChange={(value: string) => {
-                    const recipeId = parseInt(value);
-                    const recipe = recipes.find(r => r.id_receta === recipeId);
+                    const recipeId = value === "none" ? null : parseInt(value);
                     setFormData(prev => ({ 
                       ...prev, 
-                      recipeId,
-                      unitCost: recipe?.costo_estimado || prev.unitCost
+                      recipeId
                     }));
                   }}
+                  name="recipeId"
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="recipeId">
                     <SelectValue placeholder="Selecciona receta" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">Sin receta</SelectItem>
                     {recipes.map(recipe => (
                       <SelectItem key={recipe.id_receta} value={recipe.id_receta.toString()}>
-                        {recipe.nombre_receta} (${recipe.costo_estimado.toFixed(2)})
+                        {recipe.nombre_receta} (S/ {recipe.costo_estimado.toFixed(2)})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -848,9 +847,11 @@ const handleEdit = (product: FinishedProduct) => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Descripción</Label>
+              <Label htmlFor="productDescription">Descripción</Label>
               <Textarea
-                id="description"
+                id="productDescription"
+                name="productDescription"
+                autoComplete="off"
                 placeholder="Descripción del producto..."
                 value={formData.description || ""}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -859,20 +860,33 @@ const handleEdit = (product: FinishedProduct) => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="currentStock">Stock Inicial</Label>
-                <Input
-                  id="currentStock"
-                  type="number"
-                  value={formData.currentStock || ""}
-                  onChange={(e) => setFormData(prev => ({ ...prev, currentStock: parseInt(e.target.value) }))}
-                  required
-                />
+                <Label htmlFor="unitOfMeasure">Unidad de Medida</Label>
+                <Select 
+                  value={formData.unitOfMeasure || "UNIDAD"} 
+                  onValueChange={(value: string) => setFormData(prev => ({ ...prev, unitOfMeasure: value }))}
+                  name="unitOfMeasure"
+                >
+                  <SelectTrigger id="unitOfMeasure">
+                    <SelectValue placeholder="Selecciona unidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UNIDAD">Unidad</SelectItem>
+                    <SelectItem value="KILOGRAMO">Kilogramo</SelectItem>
+                    <SelectItem value="GRAMO">Gramo</SelectItem>
+                    <SelectItem value="LITRO">Litro</SelectItem>
+                    <SelectItem value="MILILITRO">Mililitro</SelectItem>
+                    <SelectItem value="DOCENA">Docena</SelectItem>
+                    <SelectItem value="CAJA">Caja</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="minStock">Stock Mínimo</Label>
                 <Input
                   id="minStock"
+                  name="minStock"
+                  autoComplete="off"
                   type="number"
                   value={formData.minStock || ""}
                   onChange={(e) => setFormData(prev => ({ ...prev, minStock: parseInt(e.target.value) }))}
@@ -881,62 +895,30 @@ const handleEdit = (product: FinishedProduct) => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="maxStock">Stock Máximo</Label>
+                <Label htmlFor="vida_util_dias">Vida Útil (días)</Label>
                 <Input
-                  id="maxStock"
+                  id="vida_util_dias"
+                  name="vida_util_dias"
+                  autoComplete="off"
                   type="number"
-                  value={formData.maxStock || ""}
-                  onChange={(e) => setFormData(prev => ({ ...prev, maxStock: parseInt(e.target.value) }))}
-                  required
+                  placeholder="Ej: 30"
+                  value={formData.vida_util_dias || ""}
+                  onChange={(e) => setFormData(prev => ({ ...prev, vida_util_dias: parseInt(e.target.value) || null }))}
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="unitCost">Costo Unitario</Label>
-                <Input
-                  id="unitCost"
-                  type="number"
-                  step="0.01"
-                  value={formData.unitCost || ""}
-                  onChange={(e) => setFormData(prev => ({ ...prev, unitCost: parseFloat(e.target.value) }))}
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="sellingPrice">Precio de Venta</Label>
+                <Label htmlFor="sellingPrice">Precio de Venta (S/)</Label>
                 <Input
                   id="sellingPrice"
+                  name="sellingPrice"
+                  autoComplete="off"
                   type="number"
                   step="0.01"
                   value={formData.sellingPrice || ""}
                   onChange={(e) => setFormData(prev => ({ ...prev, sellingPrice: parseFloat(e.target.value) }))}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="productionDate">Fecha de Producción</Label>
-                <Input
-                  id="productionDate"
-                  type="date"
-                  value={formData.productionDate || ""}
-                  onChange={(e) => setFormData(prev => ({ ...prev, productionDate: e.target.value }))}
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="expiryDate">Fecha de Vencimiento</Label>
-                <Input
-                  id="expiryDate"
-                  type="date"
-                  value={formData.expiryDate || ""}
-                  onChange={(e) => setFormData(prev => ({ ...prev, expiryDate: e.target.value }))}
                   required
                 />
               </div>

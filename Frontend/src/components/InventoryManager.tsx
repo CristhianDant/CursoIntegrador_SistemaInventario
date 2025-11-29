@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Search, Filter, Edit, Trash2, Package } from "lucide-react";
 import { Button } from "./ui/button";
+import { useAuth } from "../context/AuthContext";
 import { Input } from "./ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
@@ -31,9 +32,12 @@ interface Ingredient {
 
 
 
-const categories = ["Harinas", "Endulzantes", "Proteínas", "Lácteos", "Chocolates", "Frutas", "Especias"];
+const categories = ["Harinas", "Endulzantes", "Proteínas", "Lacteos", "Chocolates", "Frutas", "Especias"];
 
 export function InventoryManager() {
+  const { canWrite } = useAuth();
+  const canEditInsumos = canWrite('INSUMOS');
+  
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -279,12 +283,14 @@ const handleSubmit = async (e: React.FormEvent) => {
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openAddDialog}>
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar Insumo
-            </Button>
-          </DialogTrigger>
+          {canEditInsumos && (
+            <DialogTrigger asChild>
+              <Button onClick={openAddDialog}>
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar Insumo
+              </Button>
+            </DialogTrigger>
+          )}
           
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
   <DialogHeader>
@@ -517,23 +523,25 @@ const handleSubmit = async (e: React.FormEvent) => {
                 {/* 🛑 ELIMINADAS: Celdas de Vencimiento, Costo y Proveedor */}
                 
                 <TableCell>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(ingredient)}
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(ingredient.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+                  {canEditInsumos && (
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(ingredient)}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(ingredient.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                 </TableCell>
               </TableRow>
             );

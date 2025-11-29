@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginForm } from "./components/LoginForm";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./components/Dashboard";
@@ -13,38 +14,62 @@ import { ReportsManager } from "./components/ReportsManager";
 import { SettingsManager } from "./components/SettingsManager";
 import { SupplyEntryManager } from "./components/SupplyEntryManager";
 import { TypewriterSplash } from './components/TypewriterSplash';
+import { Toaster } from "./components/ui/sonner";
 
-export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState("");
+// Mapeo de páginas a módulos de permisos
+const pageToModule: Record<string, string> = {
+  'dashboard': 'DASHBOARD',
+  'inventory': 'INSUMOS',
+  'recipes': 'RECETAS',
+  'purchase-orders': 'COMPRAS',
+  'supply-entry': 'INVENTARIO',
+  'products': 'PRODUCTOS',
+  'suppliers': 'PROVEEDORES',
+  'users': 'USUARIOS',
+  'alerts': 'INVENTARIO',
+  'reports': 'REPORTES',
+  'settings': 'CONFIGURACION',
+};
+
+function AppContent() {
+  const { user, isAuthenticated, isLoading, logout, canRead, isAdmin } = useAuth();
   const [currentPage, setCurrentPage] = useState("dashboard");
-  const [showLanding, setShowLanding] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
 
-  const handleLogin = (email: string) => {
-    setCurrentUser(email);
-    setIsLoggedIn(true);
-    setShowLanding(false);
-  };
-
   const handleSplashEnd = () => {
-    // Cuando la animación de TypewriterSplash termina, ocultamos el splash
     setShowSplash(false);
   };
 
-  const handleGetStarted = () => {
-    setShowLanding(false);
-  };
-
   const handleLogout = () => {
-    setIsLoggedIn(false);
-    setCurrentUser("");
+    logout();
     setCurrentPage("dashboard");
-    setShowLanding(true);
     setShowSplash(true);
   };
 
+  // Verificar si el usuario puede acceder a la página actual
+  const canAccessPage = (page: string): boolean => {
+    if (page === 'dashboard') return true; // Dashboard siempre accesible
+    if (isAdmin()) return true; // Admin puede acceder a todo
+    const modulo = pageToModule[page];
+    return modulo ? canRead(modulo) : false;
+  };
+
+  // Cambiar de página solo si tiene permiso
+  const handlePageChange = (page: string) => {
+    if (canAccessPage(page)) {
+      setCurrentPage(page);
+    } else {
+      // Si no tiene permiso, quedarse en dashboard
+      setCurrentPage('dashboard');
+    }
+  };
+
   const renderCurrentPage = () => {
+    // Verificar permiso antes de renderizar
+    if (!canAccessPage(currentPage)) {
+      return <Dashboard />;
+    }
+
     switch (currentPage) {
       case "dashboard":
         return <Dashboard />;
@@ -77,22 +102,37 @@ export default function App() {
     return <TypewriterSplash onAnimationEnd={handleSplashEnd} />;
   }
 
-  if (showLanding) {
-    return <LoginForm onLogin={handleGetStarted} />;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    );
   }
 
-  if (!isLoggedIn) {
-    return <LoginForm onLogin={handleLogin} />;
+  if (!isAuthenticated) {
+    return <LoginForm />;
   }
 
   return (
-    <Layout
-      currentPage={currentPage}
-      onPageChange={setCurrentPage}
-      onLogout={handleLogout}
-      username={currentUser}
-    >
-      {renderCurrentPage()}
-    </Layout>
+    <>
+      <Toaster position="top-right" richColors />
+      <Layout
+        currentPage={currentPage}
+        onPageChange={handlePageChange}
+        onLogout={handleLogout}
+        username={user?.nombre || user?.email || ""}
+      >
+        {renderCurrentPage()}
+      </Layout>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
