@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db
 from modules.gestion_almacen_inusmos.produccion.schemas import (
     ProduccionRequest,
     ValidacionStockResponse,
-    ProduccionResponse
+    ProduccionResponse,
+    HistorialProduccionResponse,
+    TrazabilidadProduccionResponse
 )
 from modules.gestion_almacen_inusmos.produccion.service import ProduccionService
 from utils.standard_responses import api_response_ok, api_response_not_found, api_response_bad_request
@@ -61,6 +63,62 @@ def ejecutar_produccion(request: ProduccionRequest, db: Session = Depends(get_db
     try:
         resultado = service.ejecutar_produccion(db, request)
         return api_response_ok(resultado)
+    except HTTPException as e:
+        if e.status_code == 404:
+            return api_response_not_found(str(e.detail))
+        return api_response_bad_request(str(e.detail))
+    except Exception as e:
+        return api_response_bad_request(str(e))
+
+
+@router.get("/historial", response_model=HistorialProduccionResponse)
+def get_historial_producciones(
+    limit: int = Query(50, ge=1, le=100, description="Cantidad de registros a obtener"),
+    offset: int = Query(0, ge=0, description="Cantidad de registros a saltar"),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene el historial de producciones realizadas.
+    
+    - **limit**: Cantidad máxima de registros a retornar (default: 50, max: 100)
+    - **offset**: Cantidad de registros a saltar para paginación
+    
+    Retorna lista de producciones ordenadas por fecha descendente, con:
+    - Datos de la producción (número, fecha, cantidad)
+    - Datos de la receta utilizada
+    - Datos del producto terminado generado
+    - Usuario que ejecutó la producción
+    """
+    try:
+        historial = service.get_historial_producciones(db, limit, offset)
+        return api_response_ok(historial)
+    except Exception as e:
+        return api_response_bad_request(str(e))
+
+
+@router.get("/{id_produccion}/trazabilidad", response_model=TrazabilidadProduccionResponse)
+def get_trazabilidad_produccion(id_produccion: int, db: Session = Depends(get_db)):
+    """
+    Obtiene la trazabilidad completa de una producción específica.
+    
+    - **id_produccion**: ID de la producción a consultar
+    
+    Retorna información detallada de:
+    - **Producción**: Número, fecha, cantidad batch, usuario
+    - **Receta**: Código, nombre, rendimiento
+    - **Producto terminado**: Nombre, movimiento de entrada, stock resultante
+    - **Insumos consumidos**: Lista de lotes usados en orden FEFO con:
+      - Número de movimiento
+      - Insumo y lote
+      - Fecha de vencimiento del lote
+      - Cantidad consumida
+      - Stock antes/después
+    
+    Permite rastrear exactamente qué lotes de insumos se usaron en cada producción.
+    """
+    try:
+        trazabilidad = service.get_trazabilidad_produccion(db, id_produccion)
+        return api_response_ok(trazabilidad)
     except HTTPException as e:
         if e.status_code == 404:
             return api_response_not_found(str(e.detail))

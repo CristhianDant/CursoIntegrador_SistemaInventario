@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
 
 class Settings(BaseSettings):
     POST_USER: str
@@ -9,7 +8,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM_TOK: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
-    
+    HOST_DB: str
+
     # Configuración de Email (Gmail SMTP)
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

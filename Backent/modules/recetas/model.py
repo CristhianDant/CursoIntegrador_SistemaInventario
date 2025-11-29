@@ -22,6 +22,8 @@ class Receta(Base):
     producto = relationship("ProductoTerminado", back_populates="recetas")
     # Relación con RecetaDetalle
     detalles = relationship("RecetaDetalle", back_populates="receta")
+    # Relación con Produccion
+    producciones = relationship("Produccion", back_populates="receta")
 
 class RecetaDetalle(Base):
     __tablename__ = 'recetas_detalle'
