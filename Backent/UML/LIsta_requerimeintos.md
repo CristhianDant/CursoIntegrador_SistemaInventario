@@ -5,7 +5,7 @@
 > **Basado en:** Estándares de tesis (Kumar et al., 2021; Najlae et al., 2021; Meza Hernández, 2024)
 
 ---
-
+aaaaaaaa
 ## 📊 Resumen de Estado
 
 | Categoría | Implementado | Pendiente | % Completitud |
