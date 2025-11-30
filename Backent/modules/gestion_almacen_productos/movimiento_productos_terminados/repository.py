@@ -1,8 +1,8 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from modules.movimiento_productos_terminados.model import MovimientoProductoTerminado
-from modules.movimiento_productos_terminados.schemas import MovimientoProductoTerminadoCreate
-from modules.movimiento_productos_terminados.repository_interface import MovimientoProductoTerminadoRepositoryInterface
+from modules.gestion_almacen_productos.movimiento_productos_terminados.model import MovimientoProductoTerminado
+from modules.gestion_almacen_productos.movimiento_productos_terminados.schemas import MovimientoProductoTerminadoCreate
+from modules.gestion_almacen_productos.movimiento_productos_terminados.repository_interface import MovimientoProductoTerminadoRepositoryInterface
 
 class MovimientoProductoTerminadoRepository(MovimientoProductoTerminadoRepositoryInterface):
     def get_all(self, db: Session) -> List[MovimientoProductoTerminado]:

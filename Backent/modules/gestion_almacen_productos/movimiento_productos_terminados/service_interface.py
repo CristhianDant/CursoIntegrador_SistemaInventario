@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List
 from sqlalchemy.orm import Session
-from modules.movimiento_productos_terminados.schemas import MovimientoProductoTerminado, MovimientoProductoTerminadoCreate
+from modules.gestion_almacen_productos.movimiento_productos_terminados.schemas import MovimientoProductoTerminado, MovimientoProductoTerminadoCreate
 
 class MovimientoProductoTerminadoServiceInterface(ABC):
     @abstractmethod

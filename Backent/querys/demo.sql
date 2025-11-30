@@ -226,6 +226,28 @@ INSERT INTO produccion (numero_produccion, id_receta, cantidad_batch, id_user, f
 ('PROD-202511-2', (SELECT id_receta FROM recetas WHERE codigo_receta = 'REC-002'), 2, (SELECT id_user FROM usuario WHERE email = 'admin@panaderia.com'), '2025-11-28 14:00:00', 'Producción de ejemplo - 2 bizcochos', false);
 
 -- =================================================================
+-- 9. VENTAS DE EJEMPLO
+-- =================================================================
+
+-- VENTA 1: Venta de panes (día actual)
+INSERT INTO ventas (numero_venta, fecha_venta, total, metodo_pago, id_user, observaciones, anulado) VALUES
+('VENTA-202511-1', '2025-11-29 09:30:00', 6.00, 'efectivo', (SELECT id_user FROM usuario WHERE email = 'admin@panaderia.com'), 'Venta de mostrador - 20 panes', false);
+
+-- Detalle de VENTA 1
+INSERT INTO venta_detalles (id_venta, id_producto, cantidad, precio_unitario, descuento_porcentaje, subtotal) VALUES
+((SELECT id_venta FROM ventas WHERE numero_venta = 'VENTA-202511-1'),
+ (SELECT id_producto FROM productos_terminados WHERE codigo_producto = 'PROD-001'), 20, 0.30, 0, 6.00);
+
+-- VENTA 2: Venta de bizcochos con descuento
+INSERT INTO ventas (numero_venta, fecha_venta, total, metodo_pago, id_user, observaciones, anulado) VALUES
+('VENTA-202511-2', '2025-11-29 11:00:00', 17.50, 'tarjeta', (SELECT id_user FROM usuario WHERE email = 'admin@panaderia.com'), 'Venta con descuento del 30% por antigüedad', false);
+
+-- Detalle de VENTA 2 (1 bizcocho con 30% descuento)
+INSERT INTO venta_detalles (id_venta, id_producto, cantidad, precio_unitario, descuento_porcentaje, subtotal) VALUES
+((SELECT id_venta FROM ventas WHERE numero_venta = 'VENTA-202511-2'),
+ (SELECT id_producto FROM productos_terminados WHERE codigo_producto = 'PROD-002'), 1, 25.00, 30, 17.50);
+
+-- =================================================================
 -- 7. CONSULTAS DE PRUEBA PARA LOS ENDPOINTS
 -- =================================================================
 
@@ -313,6 +335,78 @@ INSERT INTO produccion (numero_produccion, id_receta, cantidad_batch, id_user, f
 -- Esperado: Lote que vence 2025-12-27 primero, luego 2026-05-20
 
 -- =================================================================
+-- PRUEBAS PARA VENTAS (FC-02)
+-- =================================================================
+
+-- ===== PRUEBA ENDPOINT: GET /ventas/productos-disponibles =====
+-- Obtener productos disponibles con descuentos sugeridos
+-- GET /api/v1/ventas/productos-disponibles
+-- Esperado: Lista de productos con stock > 0 y descuento según días de antigüedad
+
+-- ===== PRUEBA ENDPOINT: POST /ventas/registrar =====
+-- Registrar una venta de productos
+-- Body JSON:
+-- {
+--   "items": [
+--     {
+--       "id_producto": {id_producto_pan},
+--       "cantidad": 5,
+--       "precio_unitario": 0.30,
+--       "descuento_porcentaje": 0
+--     }
+--   ],
+--   "metodo_pago": "efectivo",
+--   "observaciones": "Venta de prueba"
+-- }
+-- Esperado: 
+-- - Venta creada con número VENTA-YYYYMM-N
+-- - Stock de productos_terminados descontado
+-- - Movimiento de SALIDA creado en movimiento_productos_terminados
+
+-- ===== PRUEBA ENDPOINT: GET /ventas/del-dia =====
+-- Obtener ventas del día actual
+-- GET /api/v1/ventas/del-dia
+-- Esperado: Lista de ventas del día con total y cantidad de items
+
+-- ===== PRUEBA ENDPOINT: GET /ventas/{id_venta} =====
+-- Obtener detalle de una venta
+-- SELECT id_venta FROM ventas WHERE numero_venta = 'VENTA-202511-1';
+-- GET /api/v1/ventas/{id_venta}
+-- Esperado: Detalle completo de la venta con todos sus items
+
+-- ===== PRUEBA ENDPOINT: POST /ventas/{id_venta}/anular =====
+-- Anular una venta y restaurar stock
+-- POST /api/v1/ventas/{id_venta}/anular
+-- Esperado:
+-- - Venta marcada como anulada
+-- - Stock de productos restaurado
+-- - Movimiento de ENTRADA (compensación) creado
+
+-- ===== VERIFICAR STOCK DESPUÉS DE VENTA =====
+-- SELECT 
+--     pt.codigo_producto,
+--     pt.nombre,
+--     pt.stock_actual
+-- FROM productos_terminados pt
+-- WHERE pt.codigo_producto IN ('PROD-001', 'PROD-002')
+-- ORDER BY pt.codigo_producto;
+
+-- ===== VERIFICAR MOVIMIENTOS DE PRODUCTOS =====
+-- SELECT 
+--     mpt.numero_movimiento,
+--     pt.nombre AS producto,
+--     mpt.tipo_movimiento,
+--     mpt.motivo,
+--     mpt.cantidad,
+--     mpt.stock_anterior,
+--     mpt.stock_nuevo,
+--     mpt.fecha_movimiento
+-- FROM movimiento_productos_terminados mpt
+-- JOIN productos_terminados pt ON mpt.id_producto = pt.id_producto
+-- WHERE mpt.tipo_documento_origen = 'VENTA'
+-- ORDER BY mpt.fecha_movimiento DESC;
+
+-- =================================================================
 -- RESUMEN DE DATOS INSERTADOS
 -- =================================================================
 -- 
@@ -322,18 +416,20 @@ INSERT INTO produccion (numero_produccion, id_receta, cantidad_batch, id_user, f
 -- RECETAS: 2
 --   - Pan Francés (REC-001): 4 ingredientes, rinde 20 unidades
 --   - Bizcocho de Vainilla (REC-002): 7 ingredientes, rinde 1 unidad
--- INGRESOS DE INSUMOS: 5 (con múltiples lotes)
--- LOTES TOTALES: 10
+-- INGRESOS DE INSUMOS: 6 (con múltiples lotes)
+-- LOTES TOTALES: 11
+-- PRODUCCIONES DE EJEMPLO: 2
+-- VENTAS DE EJEMPLO: 2
 --
 -- STOCK DISPONIBLE INICIAL:
--- - Harina: 50 kg (1 lote)
+-- - Harina: 90 kg (2 lotes: vence 2025-12-27 y 2026-05-20)
 -- - Levadura: 5 kg (1 lote)
--- - Sal: 20 kg (1 lote)
+-- - Sal: 20 kg (1 lote, vence 2027-11-20)
 -- - Leche: 20 L (1 lote, vence pronto)
 -- - Mantequilla: 10 kg (1 lote)
 -- - Huevos: 350 unidades (2 lotes, FEFO importante)
 -- - Azúcar Blanca: 50 kg (1 lote)
 -- - Azúcar Impalpable: 10 kg (1 lote)
--- - Aceite: 10 L (1 lote)
+-- - Aceite: 10 L (1 lote, vence 2027-11-18)
 -- - Esencia Vainilla: 0.5 L (1 lote)
 -- =================================================================
