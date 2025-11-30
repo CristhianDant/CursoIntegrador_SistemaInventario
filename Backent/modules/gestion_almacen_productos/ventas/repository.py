@@ -40,6 +40,34 @@ class VentasRepository(VentasRepositoryInterface):
         
         return f"{prefijo}{nuevo_numero}"
 
+    def generar_numero_movimiento_productos_terminados(self, db: Session) -> str:
+        """
+        Genera un número de movimiento único para movimiento_productos_terminados.
+        Formato: MPT-YYYYMM-NNNNN
+        Ejemplo: MPT-202511-00001
+        """
+        fecha_actual = datetime.datetime.now()
+        prefijo = f"MPT-{fecha_actual.strftime('%Y%m')}-"
+
+        query_ultimo = text("""
+            SELECT numero_movimiento 
+            FROM movimiento_productos_terminados 
+            WHERE numero_movimiento LIKE :prefijo
+            ORDER BY id_movimiento DESC
+            LIMIT 1
+        """)
+
+        result = db.execute(query_ultimo, {"prefijo": f"{prefijo}%"})
+        ultimo = result.fetchone()
+
+        if ultimo:
+            ultimo_numero = int(ultimo.numero_movimiento.split('-')[-1])
+            nuevo_numero = ultimo_numero + 1
+        else:
+            nuevo_numero = 1
+
+        return f"{prefijo}{nuevo_numero:05d}"
+
     def crear_venta(
         self, 
         db: Session, 
@@ -62,7 +90,7 @@ class VentasRepository(VentasRepositoryInterface):
             )
             VALUES (
                 :numero_venta, 
-                NOW(), 
+                :fecha_venta, 
                 :total, 
                 :metodo_pago, 
                 :id_user, 
@@ -74,6 +102,7 @@ class VentasRepository(VentasRepositoryInterface):
         
         result = db.execute(query, {
             "numero_venta": numero_venta,
+            "fecha_venta": datetime.datetime.now(),
             "total": float(total),
             "metodo_pago": metodo_pago,
             "id_user": id_user,
@@ -164,6 +193,130 @@ class VentasRepository(VentasRepositoryInterface):
         
         row = result.fetchone()
         return Decimal(str(row.stock_actual)) if row else Decimal('0')
+
+    def incrementar_stock_producto(
+        self,
+        db: Session,
+        id_producto: int,
+        cantidad: Decimal
+    ) -> Decimal:
+        """Incrementa stock de un producto y retorna el nuevo stock."""
+        query = text("""
+            UPDATE productos_terminados
+            SET stock_actual = stock_actual + :cantidad
+            WHERE id_producto = :id_producto
+            RETURNING stock_actual
+        """)
+
+        result = db.execute(query, {
+            "cantidad": float(cantidad),
+            "id_producto": id_producto
+        })
+
+        row = result.fetchone()
+        return Decimal(str(row.stock_actual)) if row else Decimal('0')
+
+    def crear_movimiento_salida(
+        self,
+        db: Session,
+        id_producto: int,
+        cantidad: Decimal,
+        id_user: int,
+        id_venta: int,
+        numero_venta: str
+    ):
+        """Crea un movimiento de SALIDA en movimiento_productos_terminados."""
+        numero_movimiento = self.generar_numero_movimiento_productos_terminados(db)
+
+        query = text("""
+            INSERT INTO movimiento_productos_terminados (
+                numero_movimiento,
+                id_producto,
+                tipo_movimiento,
+                motivo,
+                cantidad,
+                fecha_movimiento,
+                id_user,
+                id_documento_origen,
+                tipo_documento_origen,
+                observaciones,
+                anulado
+            )
+            VALUES (
+                :numero_movimiento,
+                :id_producto,
+                'SALIDA',
+                'VENTA',
+                :cantidad,
+                :fecha_movimiento,
+                :id_user,
+                :id_venta,
+                'VENTA',
+                :observaciones,
+                false
+            )
+        """)
+
+        db.execute(query, {
+            "numero_movimiento": numero_movimiento,
+            "id_producto": id_producto,
+            "cantidad": float(cantidad),
+            "fecha_movimiento": datetime.datetime.now(),
+            "id_user": id_user,
+            "id_venta": id_venta,
+            "observaciones": f"Salida por venta {numero_venta}"
+        })
+
+    def crear_movimiento_entrada_compensacion(
+        self,
+        db: Session,
+        id_producto: int,
+        cantidad: Decimal,
+        id_user: int,
+        id_venta: int,
+        numero_venta: str
+    ):
+        """Crea un movimiento de ENTRADA por anulación de venta."""
+        numero_movimiento = self.generar_numero_movimiento_productos_terminados(db)
+
+        query = text("""
+            INSERT INTO movimiento_productos_terminados (
+                numero_movimiento,
+                id_producto,
+                tipo_movimiento,
+                motivo,
+                cantidad,
+                fecha_movimiento,
+                id_user,
+                id_documento_origen,
+                tipo_documento_origen,
+                observaciones,
+                anulado
+            )
+            VALUES (
+                :numero_movimiento,
+                :id_producto,
+                'ENTRADA',
+                'ANULACION_VENTA',
+                :cantidad,
+                :fecha_movimiento,
+                :id_user,
+                :id_venta,
+                'VENTA',
+                :observaciones,
+                false
+            )
+        """)
+
+        db.execute(query, {
+            "numero_movimiento": numero_movimiento,
+            "id_producto": id_producto,
+            "cantidad": float(cantidad),
+            "fecha_movimiento": datetime.datetime.now(),
+            "id_user": id_user,
+            "id_venta": id_venta,
+            "observaciones": f"Entrada por anulación de venta {numero_venta}"
+        })
 
     def get_producto_info(self, db: Session, id_producto: int) -> Optional[Dict[str, Any]]:
         """Obtiene información de un producto terminado."""

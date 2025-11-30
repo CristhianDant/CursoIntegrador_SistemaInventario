@@ -4,9 +4,6 @@ from typing import List
 from database import get_db
 from modules.gestion_almacen_productos.movimiento_productos_terminados.schemas import MovimientoProductoTerminado
 from modules.gestion_almacen_productos.movimiento_productos_terminados.service import MovimientoProductoTerminadoService
-from utils.standard_responses import api_response_ok, api_response_not_found
-from modules.movimiento_productos_terminados.schemas import MovimientoProductoTerminado, MovimientoProductoTerminadoCreate
-from modules.movimiento_productos_terminados.service import MovimientoProductoTerminadoService
 from modules.productos_terminados.repository import ProductoTerminadoRepository
 from utils.standard_responses import api_response_ok, api_response_not_found, api_response_bad_request
 

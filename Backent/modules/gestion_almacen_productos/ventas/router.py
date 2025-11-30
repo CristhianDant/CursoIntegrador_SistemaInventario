@@ -17,10 +17,7 @@ from utils.standard_responses import (
     api_response_internal_server_error
 )
 
-router = APIRouter(
-    prefix="/ventas",
-    tags=["Ventas"]
-)
+router = APIRouter()
 
 service = VentasService()
 
@@ -89,12 +86,34 @@ def obtener_ventas_del_dia(
             fecha = date.today()
         
         ventas = service.get_ventas_del_dia(db, fecha)
-        return create_success_response(
-            data=ventas.model_dump(),
-            message=f"Ventas del día {fecha}"
+        return api_response_ok(
+            data=ventas.model_dump()
         )
     except Exception as e:
-        return create_error_response(str(e), status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return api_response_internal_server_error(str(e))
+
+
+@router.get("/productos-disponibles", response_model=dict)
+def obtener_productos_disponibles(
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene productos disponibles para venta con descuentos sugeridos.
+
+    **Implementa FC-09:** Descuento automático según antigüedad:
+    - 1 día: 30% descuento
+    - 2 días: 50% descuento
+    - 3+ días: 70% descuento
+
+    Solo retorna productos con stock > 0.
+    """
+    try:
+        productos = service.get_productos_disponibles(db)
+        return api_response_ok(
+            data=[p.model_dump() for p in productos]
+        )
+    except Exception as e:
+        return api_response_internal_server_error(str(e))
 
 
 @router.get("/{id_venta}", response_model=dict)
@@ -111,41 +130,16 @@ def obtener_venta_por_id(
     """
     try:
         venta = service.get_venta_por_id(db, id_venta)
-        return create_success_response(
-            data=venta.model_dump(),
-            message="Venta obtenida exitosamente"
+        return api_response_ok(
+            data=venta.model_dump()
         )
     except HTTPException as e:
         raise e
     except Exception as e:
-        return create_error_response(str(e), status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return api_response_internal_server_error(str(e))
 
 
-@router.get("/productos-disponibles", response_model=dict)
-def obtener_productos_disponibles(
-    db: Session = Depends(get_db)
-):
-    """
-    Obtiene productos disponibles para venta con descuentos sugeridos.
-    
-    **Implementa FC-09:** Descuento automático según antigüedad:
-    - 1 día: 30% descuento
-    - 2 días: 50% descuento
-    - 3+ días: 70% descuento
-    
-    Solo retorna productos con stock > 0.
-    """
-    try:
-        productos = service.get_productos_disponibles(db)
-        return create_success_response(
-            data=[p.model_dump() for p in productos],
-            message=f"{len(productos)} productos disponibles"
-        )
-    except Exception as e:
-        return create_error_response(str(e), status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@router.post("/{id_venta}/anular", response_model=dict)
+@router.post("/anular/{id_venta}", response_model=dict)
 def anular_venta(
     id_venta: int,
     db: Session = Depends(get_db)
@@ -166,11 +160,10 @@ def anular_venta(
         id_user = 1  # Temporal
         
         venta = service.anular_venta(db, id_venta, id_user)
-        return create_success_response(
-            data=venta.model_dump(),
-            message="Venta anulada exitosamente"
+        return api_response_ok(
+            data=venta.model_dump()
         )
     except HTTPException as e:
         raise e
     except Exception as e:
-        return create_error_response(str(e), status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return api_response_internal_server_error(str(e))

@@ -19,8 +19,7 @@ from modules.orden_de_compra import router as orden_de_compra_router
 from modules.gestion_almacen_inusmos.ingresos_insumos import router as ingresos_productos_router
 from modules.calidad_desperdicio_merma import router as merma_router
 from modules.gestion_almacen_inusmos.movimiento_insumos import router as movimiento_insumos_router
-from modules.gestion_almacen_productos.movimiento_productos_terminados import \
-    router as movimiento_productos_terminados_router
+from modules.gestion_almacen_productos.movimiento_productos_terminados import router as movimiento_productos_terminados_router
 from modules.gestion_almacen_inusmos.produccion import router as produccion_router
 from modules.gestion_almacen_productos.ventas import router as ventas_router
 from modules.email_service import router as email_router
@@ -69,6 +68,7 @@ app.include_router(merma_router.router, prefix="/api/v1/mermas", tags=["Mermas"]
 app.include_router(movimiento_insumos_router.router, prefix="/api/v1/movimientos_insumos", tags=["Movimientos de Insumos"])
 app.include_router(movimiento_productos_terminados_router.router, prefix="/api/v1/movimientos_productos_terminados", tags=["Movimientos de Productos Terminados"])
 app.include_router(produccion_router.router, prefix="/api/v1/produccion", tags=["Produccion"])
+app.include_router(ventas_router.router, prefix="/api/v1/ventas", tags=["Ventas"])
 
 
 @app.get("/")

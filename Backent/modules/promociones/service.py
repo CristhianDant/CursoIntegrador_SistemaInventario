@@ -8,7 +8,7 @@ from .schemas import (
     SugerenciaPromocion, EstadisticasPromociones, ProductoComboResponse
 )
 from modules.productos_terminados.model import ProductoTerminado
-from modules.movimiento_productos_terminados.model import MovimientoProductoTerminado
+from modules.gestion_almacen_productos.movimiento_productos_terminados.model import MovimientoProductoTerminado
 
 class PromocionService:
     def __init__(self, db: Session):

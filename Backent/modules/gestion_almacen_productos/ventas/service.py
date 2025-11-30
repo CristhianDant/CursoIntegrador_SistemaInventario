@@ -112,8 +112,6 @@ class VentasService(VentasServiceInterface):
                     db=db,
                     id_producto=item.id_producto,
                     cantidad=item.cantidad,
-                    stock_anterior=stock_anterior,
-                    stock_nuevo=stock_nuevo,
                     id_user=id_user,
                     id_venta=id_venta,
                     numero_venta=numero_venta
@@ -190,8 +188,8 @@ class VentasService(VentasServiceInterface):
         ventas = self.repository.get_ventas_del_dia(db, fecha)
         
         total_ventas = len(ventas)
-        monto_total = sum(v["total"] for v in ventas if not v["anulado"])
-        
+        monto_total = sum((v["total"] for v in ventas if not v["anulado"]), Decimal("0"))
+
         ventas_response = [
             VentaResumenResponse(**venta)
             for venta in ventas
@@ -277,27 +275,17 @@ class VentasService(VentasServiceInterface):
                 )
                 
                 # Incrementar stock (restaurar)
-                nuevo_stock = stock_anterior + detalle["cantidad"]
-                
-                # Actualizar stock manualmente
-                from sqlalchemy import text
-                query = text("""
-                    UPDATE productos_terminados
-                    SET stock_actual = :nuevo_stock
-                    WHERE id_producto = :id_producto
-                """)
-                db.execute(query, {
-                    "nuevo_stock": float(nuevo_stock),
-                    "id_producto": detalle["id_producto"]
-                })
-                
+                nuevo_stock = self.repository.incrementar_stock_producto(
+                    db=db,
+                    id_producto=detalle["id_producto"],
+                    cantidad=detalle["cantidad"]
+                )
+
                 # Crear movimiento de entrada (compensación)
                 self._crear_movimiento_entrada_compensacion(
                     db=db,
                     id_producto=detalle["id_producto"],
                     cantidad=detalle["cantidad"],
-                    stock_anterior=stock_anterior,
-                    stock_nuevo=nuevo_stock,
                     id_user=id_user,
                     id_venta=id_venta,
                     numero_venta=venta_data["numero_venta"]
@@ -330,161 +318,35 @@ class VentasService(VentasServiceInterface):
         db: Session,
         id_producto: int,
         cantidad: Decimal,
-        stock_anterior: Decimal,
-        stock_nuevo: Decimal,
         id_user: int,
         id_venta: int,
         numero_venta: str
     ):
         """Crea un movimiento de SALIDA en movimiento_productos_terminados."""
-        from sqlalchemy import text
-        
-        # Generar número de movimiento
-        fecha_actual = datetime.now()
-        prefijo = f"MPT-{fecha_actual.strftime('%Y%m')}-"
-        
-        query_ultimo = text("""
-            SELECT numero_movimiento 
-            FROM movimiento_productos_terminados 
-            WHERE numero_movimiento LIKE :prefijo
-            ORDER BY id_movimiento DESC
-            LIMIT 1
-        """)
-        
-        result = db.execute(query_ultimo, {"prefijo": f"{prefijo}%"})
-        ultimo = result.fetchone()
-        
-        if ultimo:
-            ultimo_numero = int(ultimo.numero_movimiento.split('-')[-1])
-            nuevo_numero = ultimo_numero + 1
-        else:
-            nuevo_numero = 1
-        
-        numero_movimiento = f"{prefijo}{nuevo_numero:05d}"
-        
-        # Insertar movimiento
-        query = text("""
-            INSERT INTO movimiento_productos_terminados (
-                numero_movimiento,
-                id_producto,
-                tipo_movimiento,
-                motivo,
-                cantidad,
-                stock_anterior,
-                stock_nuevo,
-                fecha_movimiento,
-                id_user,
-                id_documento_origen,
-                tipo_documento_origen,
-                observaciones,
-                anulado
-            )
-            VALUES (
-                :numero_movimiento,
-                :id_producto,
-                'SALIDA',
-                'VENTA',
-                :cantidad,
-                :stock_anterior,
-                :stock_nuevo,
-                NOW(),
-                :id_user,
-                :id_venta,
-                'VENTA',
-                :observaciones,
-                false
-            )
-        """)
-        
-        db.execute(query, {
-            "numero_movimiento": numero_movimiento,
-            "id_producto": id_producto,
-            "cantidad": float(cantidad),
-            "stock_anterior": float(stock_anterior),
-            "stock_nuevo": float(stock_nuevo),
-            "id_user": id_user,
-            "id_venta": id_venta,
-            "observaciones": f"Salida por venta {numero_venta}"
-        })
-    
+        self.repository.crear_movimiento_salida(
+            db=db,
+            id_producto=id_producto,
+            cantidad=cantidad,
+            id_user=id_user,
+            id_venta=id_venta,
+            numero_venta=numero_venta
+        )
+
     def _crear_movimiento_entrada_compensacion(
         self,
         db: Session,
         id_producto: int,
         cantidad: Decimal,
-        stock_anterior: Decimal,
-        stock_nuevo: Decimal,
         id_user: int,
         id_venta: int,
         numero_venta: str
     ):
         """Crea un movimiento de ENTRADA por anulación de venta."""
-        from sqlalchemy import text
-        
-        # Generar número de movimiento
-        fecha_actual = datetime.now()
-        prefijo = f"MPT-{fecha_actual.strftime('%Y%m')}-"
-        
-        query_ultimo = text("""
-            SELECT numero_movimiento 
-            FROM movimiento_productos_terminados 
-            WHERE numero_movimiento LIKE :prefijo
-            ORDER BY id_movimiento DESC
-            LIMIT 1
-        """)
-        
-        result = db.execute(query_ultimo, {"prefijo": f"{prefijo}%"})
-        ultimo = result.fetchone()
-        
-        if ultimo:
-            ultimo_numero = int(ultimo.numero_movimiento.split('-')[-1])
-            nuevo_numero = ultimo_numero + 1
-        else:
-            nuevo_numero = 1
-        
-        numero_movimiento = f"{prefijo}{nuevo_numero:05d}"
-        
-        # Insertar movimiento
-        query = text("""
-            INSERT INTO movimiento_productos_terminados (
-                numero_movimiento,
-                id_producto,
-                tipo_movimiento,
-                motivo,
-                cantidad,
-                stock_anterior,
-                stock_nuevo,
-                fecha_movimiento,
-                id_user,
-                id_documento_origen,
-                tipo_documento_origen,
-                observaciones,
-                anulado
-            )
-            VALUES (
-                :numero_movimiento,
-                :id_producto,
-                'ENTRADA',
-                'ANULACION_VENTA',
-                :cantidad,
-                :stock_anterior,
-                :stock_nuevo,
-                NOW(),
-                :id_user,
-                :id_venta,
-                'VENTA',
-                :observaciones,
-                false
-            )
-        """)
-        
-        db.execute(query, {
-            "numero_movimiento": numero_movimiento,
-            "id_producto": id_producto,
-            "cantidad": float(cantidad),
-            "stock_anterior": float(stock_anterior),
-            "stock_nuevo": float(stock_nuevo),
-            "id_user": id_user,
-            "id_venta": id_venta,
-            "observaciones": f"Entrada por anulación de venta {numero_venta}"
-        })
+        self.repository.crear_movimiento_entrada_compensacion(
+            db=db,
+            id_producto=id_producto,
+            cantidad=cantidad,
+            id_user=id_user,
+            id_venta=id_venta,
+            numero_venta=numero_venta
+        )
