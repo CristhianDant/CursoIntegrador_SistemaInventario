@@ -45,6 +45,17 @@ def setup_logging():
         backtrace=True,  # Mostrar el traceback completo para los errores.
         diagnose=True,  # Añadir información de diagnóstico para depuración.
     )
+    
+    # Añadir un manejador para logs de sesiones de usuario en formato JSON.
+    logger.add(
+        "logs/sesiones.log",
+        level="INFO",
+        rotation="1 day",  # Rotar el archivo diariamente.
+        retention="30 days",  # Mantener los logs de los últimos 30 días.
+        format="{message}",  # Solo el mensaje para permitir formato JSON.
+        filter=lambda record: "session_login" in record["extra"] or "session_failed" in record["extra"],
+        serialize=False,  # No serializar automáticamente, lo haremos manualmente.
+    )
 
     # Interceptar todos los logs estándar.
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
