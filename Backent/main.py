@@ -25,6 +25,7 @@ from modules.gestion_almacen_productos.ventas import router as ventas_router
 from modules.email_service import router as email_router
 from modules.email_service.service import EmailService
 from modules.promociones import promocion_router
+from modules.reportes import router as reportes_router
 from database import SessionLocal
 
 # Configurar el logging antes de crear la aplicación
@@ -69,6 +70,7 @@ app.include_router(movimiento_insumos_router.router, prefix="/api/v1/movimientos
 app.include_router(movimiento_productos_terminados_router.router, prefix="/api/v1/movimientos_productos_terminados", tags=["Movimientos de Productos Terminados"])
 app.include_router(produccion_router.router, prefix="/api/v1/produccion", tags=["Produccion"])
 app.include_router(ventas_router.router, prefix="/api/v1/ventas", tags=["Ventas"])
+app.include_router(reportes_router.router, prefix="/api/v1/reportes", tags=["Reportes"])
 
 
 @app.get("/")
