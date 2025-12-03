@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { SearchableSelect } from './ui/searchable-select';
 import { toast } from 'sonner';
 import { API_BASE_URL } from '../constants';
+import { TablePagination, usePagination } from './ui/table-pagination';
 
 // --- CONFIGURACIÓN DE URL UNIFICADA ---
 const SUPPLY_ENTRY_API_URL = `${API_BASE_URL}/v1/ingresos_productos`;
@@ -448,6 +449,17 @@ export function SupplyEntryManager() {
     (entry.nombre_proveedor || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Paginación
+  const {
+    currentPage,
+    setCurrentPage,
+    itemsPerPage,
+    setItemsPerPage,
+    totalPages,
+    totalItems,
+    paginatedItems: paginatedEntries,
+  } = usePagination(filteredEntries, 9);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -475,7 +487,7 @@ export function SupplyEntryManager() {
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredEntries.map(entry => (
+        {paginatedEntries.map(entry => (
           <Card key={entry.id_ingreso}>
             <CardHeader>
               <div className="flex justify-between items-start">
@@ -521,6 +533,17 @@ export function SupplyEntryManager() {
           </Card>
         ))}
       </div>
+
+      {/* Paginación */}
+      <TablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
+        onItemsPerPageChange={setItemsPerPage}
+        itemsPerPageOptions={[9, 18, 27, 45]}
+      />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">

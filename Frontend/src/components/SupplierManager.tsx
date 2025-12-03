@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch"; // Importamos el Switch
 import { API_BASE_URL } from "../constants";
+import { TablePagination, usePagination } from "./ui/table-pagination";
 
 // --- INTERFACES AJUSTADAS AL MODELO DE LA API ---
 
@@ -212,6 +213,17 @@ export function SupplierManager() {
     );
   });
 
+  // Paginación
+  const {
+    currentPage,
+    setCurrentPage,
+    itemsPerPage,
+    setItemsPerPage,
+    totalPages,
+    totalItems,
+    paginatedItems: paginatedSuppliers,
+  } = usePagination(filteredSuppliers, 10);
+
   const formatDate = (dateString: string) => {
       if (!dateString) return "N/A";
       try {
@@ -387,7 +399,7 @@ export function SupplierManager() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSuppliers.map((proveedor) => (
+                {paginatedSuppliers.map((proveedor) => (
                   <TableRow key={proveedor.id_proveedor}>
                     <TableCell className="font-medium">{proveedor.nombre}</TableCell>
                     
@@ -459,6 +471,16 @@ export function SupplierManager() {
               </TableBody>
             </Table>
           </div>
+          
+          {/* Paginación */}
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setItemsPerPage}
+          />
         </CardContent>
       </Card>
       

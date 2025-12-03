@@ -55,8 +55,8 @@
       --tw-drop-shadow-size: initial;
       --tw-duration: initial;
       --tw-ease: initial;
-      /* Define el número de pasos. Si el texto tiene 25 letras, usa 25 */
-      --type-steps: 29; 
+      /* Define el número de pasos (caracteres del texto "Bienvenido al Sistema de Gestión" = 32) */
+      --type-steps: 32; 
       /* Define la duración total de la animación de escritura */
       --type-duration: 3s;
     }
@@ -3273,10 +3273,10 @@ html {
 /* Animación de escribir */
 @keyframes typing {
   from {
-    width: 0; 
+    max-width: 0; 
   }
   to {
-    width: 100%; 
+    max-width: 100%; 
   }
 }
 
@@ -3288,14 +3288,15 @@ html {
 }
 
 .typewriter {
-  width: fit-content; 
+  display: inline-block;
   overflow: hidden; 
   white-space: nowrap; 
+  max-width: 0;
   
-  /* 🚀 CORRECCIÓN: Añadir 'forwards' a la animación de 'typing' */
   animation: 
     typing var(--type-duration) steps(var(--type-steps), end) forwards,
-    blink-caret 0.75s step-end infinite var(--type-duration) forwards;
+    blink-caret 0.75s step-end infinite;
   
   border-right: 3px solid #f97316;
+}
 }

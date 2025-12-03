@@ -55,6 +55,12 @@ class ProduccionService(ProduccionServiceInterface):
         receta = receta_data["receta"]
         insumos = receta_data["insumos"]
         
+        # Obtener rendimiento de la receta (unidades por lote)
+        rendimiento = Decimal(str(receta["rendimiento_producto_terminado"]))
+        
+        # Calcular unidades totales a producir
+        unidades_totales = cantidad_batch * rendimiento
+        
         # Validar cada insumo
         insumos_validados: List[InsumoRequeridoResponse] = []
         puede_producir = True
@@ -64,8 +70,10 @@ class ProduccionService(ProduccionServiceInterface):
             if insumo["es_opcional"]:
                 continue
             
-            # Calcular cantidad requerida para el batch
-            cantidad_requerida = Decimal(str(insumo["cantidad_por_rendimiento"])) * cantidad_batch
+            # Calcular cantidad requerida: cantidad_por_unidad × lotes × rendimiento
+            # cantidad_por_rendimiento es la cantidad necesaria para 1 unidad del producto
+            cantidad_por_unidad = Decimal(str(insumo["cantidad_por_rendimiento"]))
+            cantidad_requerida = cantidad_por_unidad * unidades_totales
             
             # Obtener stock disponible
             stock_disponible = self.repository.get_stock_disponible_insumo(db, insumo["id_insumo"])
@@ -88,7 +96,7 @@ class ProduccionService(ProduccionServiceInterface):
         
         # Construir mensaje
         if puede_producir:
-            mensaje = f"Stock suficiente para producir {cantidad_batch} unidades de {receta['nombre_receta']}"
+            mensaje = f"Stock suficiente para producir {unidades_totales} unidades de {receta['nombre_receta']}"
         else:
             insumos_faltantes = [ins.nombre_insumo for ins in insumos_validados if not ins.es_suficiente]
             mensaje = f"Stock insuficiente para los siguientes insumos: {', '.join(insumos_faltantes)}"
@@ -144,14 +152,19 @@ class ProduccionService(ProduccionServiceInterface):
             
             total_movimientos = 0
             
+            # Calcular rendimiento y unidades totales
+            rendimiento = Decimal(str(receta["rendimiento_producto_terminado"]))
+            unidades_totales = request.cantidad_batch * rendimiento
+            
             # PASO 2: Descontar cada insumo en orden FEFO
             for insumo in insumos:
                 # Saltar opcionales
                 if insumo["es_opcional"]:
                     continue
                 
-                # Calcular cantidad requerida
-                cantidad_requerida = Decimal(str(insumo["cantidad_por_rendimiento"])) * request.cantidad_batch
+                # Calcular cantidad requerida: cantidad_por_unidad × unidades_totales
+                cantidad_por_unidad = Decimal(str(insumo["cantidad_por_rendimiento"]))
+                cantidad_requerida = cantidad_por_unidad * unidades_totales
                 
                 # Descontar usando FEFO y crear movimientos
                 # AHORA usa id_produccion como id_documento_origen
@@ -170,9 +183,8 @@ class ProduccionService(ProduccionServiceInterface):
             id_producto = self.repository.get_id_producto_de_receta(db, request.id_receta)
             
             if id_producto:
-                # Calcular cantidad producida
-                rendimiento = Decimal(str(receta["rendimiento_producto_terminado"]))
-                cantidad_producida = request.cantidad_batch * rendimiento
+                # Calcular cantidad producida (ya calculada como unidades_totales)
+                cantidad_producida = unidades_totales
                 
                 # Obtener stock anterior
                 stock_anterior = self.repository.get_stock_producto_terminado(db, id_producto)

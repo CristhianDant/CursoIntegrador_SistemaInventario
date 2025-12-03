@@ -39,6 +39,7 @@ def ejecutar_alertas_diarias_wrapper():
         
         logger.info("=" * 60)
         logger.info("✅ [JOB] Resumen de ejecución:")
+        logger.info(f"   🔄 Alertas resueltas: {resultado['alertas_resueltas']}")
         logger.info(f"   📊 Alertas vencimiento: {resultado['alertas_vencimiento']}")
         logger.info(f"   📊 Alertas stock: {resultado['alertas_stock']}")
         logger.info(f"   📧 Emails encolados: {resultado['emails_encolados']}")
@@ -70,6 +71,7 @@ def ejecutar_alertas_diarias(db: Session, id_empresa: int = 1) -> dict:
     resultado = {
         "alertas_vencimiento": 0,
         "alertas_stock": 0,
+        "alertas_resueltas": 0,
         "emails_encolados": 0
     }
     
@@ -77,6 +79,10 @@ def ejecutar_alertas_diarias(db: Session, id_empresa: int = 1) -> dict:
         # Obtener configuración de la empresa
         config = _obtener_configuracion(db, id_empresa)
         logger.info(f"📋 Configuración cargada: {config}")
+        
+        # 0. NUEVO: Resolver alertas de stock que ya no aplican
+        alertas_resueltas = _resolver_alertas_stock_normalizados(db)
+        resultado["alertas_resueltas"] = alertas_resueltas
         
         # 1. Generar alertas de vencimiento
         alertas_venc = _generar_alertas_vencimiento(db, config)
@@ -106,6 +112,58 @@ def ejecutar_alertas_diarias(db: Session, id_empresa: int = 1) -> dict:
         logger.error(f"❌ Error en job de alertas: {e}")
         db.rollback()
         raise
+
+
+def _resolver_alertas_stock_normalizados(db: Session) -> int:
+    """
+    Resuelve (desactiva) alertas de STOCK_CRITICO para insumos que 
+    ya tienen stock suficiente (>= stock_minimo).
+    
+    Returns:
+        Número de alertas resueltas/desactivadas
+    """
+    logger.info("🔍 Verificando alertas de stock que ya no aplican...")
+    
+    # SQL: Obtener insumos que YA tienen stock suficiente
+    sql_stock_ok = text("""
+        SELECT 
+            ins.id_insumo,
+            ins.nombre,
+            ins.stock_minimo,
+            COALESCE(SUM(d.cantidad_restante), 0) AS stock_actual
+        FROM insumo ins
+        LEFT JOIN ingresos_insumos_detalle d ON ins.id_insumo = d.id_insumo
+        LEFT JOIN ingresos_insumos i ON d.id_ingreso = i.id_ingreso AND i.anulado = false
+        WHERE ins.anulado = false
+        GROUP BY ins.id_insumo, ins.nombre, ins.stock_minimo
+        HAVING COALESCE(SUM(d.cantidad_restante), 0) >= ins.stock_minimo
+    """)
+    
+    insumos_ok = db.execute(sql_stock_ok).fetchall()
+    ids_insumos_ok = [row.id_insumo for row in insumos_ok]
+    
+    if not ids_insumos_ok:
+        logger.info("📦 No hay insumos con stock normalizado")
+        return 0
+    
+    # Desactivar alertas de STOCK_CRITICO para estos insumos
+    alertas_resueltas = db.query(Notificacion).filter(
+        Notificacion.id_insumo.in_(ids_insumos_ok),
+        Notificacion.tipo == TipoAlertaEnum.STOCK_CRITICO,
+        Notificacion.activa == True
+    ).update({"activa": False}, synchronize_session=False)
+    
+    if alertas_resueltas > 0:
+        for row in insumos_ok:
+            # Solo loguear los que tenían alertas
+            logger.info(
+                f"✅ Alerta resuelta: {row.nombre} - "
+                f"Stock actual: {row.stock_actual} >= Mínimo: {row.stock_minimo}"
+            )
+    
+    logger.info(f"🔄 {alertas_resueltas} alertas de stock resueltas automáticamente")
+    
+    return alertas_resueltas
 
 
 def _obtener_configuracion(db: Session, id_empresa: int) -> dict:

@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Switch } from "./ui/switch";
 import { Label } from "./ui/label";
 import { API_BASE_URL } from "../constants";
+import { TablePagination, usePagination } from "./ui/table-pagination";
 
 // Interfaces basadas en los schemas del backend
 interface NotificacionResponse {
@@ -145,7 +146,7 @@ export function AlertsManager() {
     fetchData();
     
     // Auto refresh cada 2 minutos si está activado
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (autoRefresh) {
       interval = setInterval(fetchData, 2 * 60 * 1000);
     }
@@ -193,6 +194,17 @@ export function AlertsManager() {
     
     return matchesType && matchesPriority && matchesDismissed;
   });
+
+  // Filtered lists for each tab
+  const highPriorityAlerts = filteredNotificaciones.filter(n => n.semaforo === 'ROJO' || n.tipo === 'VENCIDO');
+  const expiringAlerts = filteredNotificaciones.filter(n => n.tipo === 'VENCIMIENTO_PROXIMO' || n.tipo === 'USAR_HOY');
+  const stockAlerts = filteredNotificaciones.filter(n => n.tipo === 'STOCK_CRITICO');
+
+  // Paginación para cada tab
+  const allPagination = usePagination(filteredNotificaciones, 10);
+  const highPagination = usePagination(highPriorityAlerts, 10);
+  const expiringPagination = usePagination(expiringAlerts, 10);
+  const stockPagination = usePagination(stockAlerts, 10);
 
   const getAlertIcon = (tipo: NotificacionResponse['tipo']) => {
     switch (tipo) {
@@ -407,115 +419,265 @@ export function AlertsManager() {
               </CardContent>
             </Card>
           ) : (
-            filteredNotificaciones.map((notif) => (
-              <Alert 
-                key={notif.id_notificacion} 
-                className={`${getAlertColor(notif.tipo, notif.semaforo)} ${
-                  notif.leida ? 'opacity-60' : ''
-                }`}
-              >
-                {getAlertIcon(notif.tipo)}
-                <div className="flex-1">
-                  <AlertDescription>
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <span className="font-semibold">{notif.nombre_insumo || notif.titulo}</span>
-                          <Badge variant={getPriorityBadge(notif.tipo, notif.semaforo)} className="text-xs">
-                            {notif.semaforo || notif.tipo}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {notif.tipo.replace('_', ' ')}
-                          </Badge>
+            <>
+              {allPagination.paginatedItems.map((notif) => (
+                <Alert 
+                  key={notif.id_notificacion} 
+                  className={`${getAlertColor(notif.tipo, notif.semaforo)} ${
+                    notif.leida ? 'opacity-60' : ''
+                  }`}
+                >
+                  {getAlertIcon(notif.tipo)}
+                  <div className="flex-1">
+                    <AlertDescription>
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="font-semibold">{notif.nombre_insumo || notif.titulo}</span>
+                            <Badge variant={getPriorityBadge(notif.tipo, notif.semaforo)} className="text-xs">
+                              {notif.semaforo || notif.tipo}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {notif.tipo.replace('_', ' ')}
+                            </Badge>
+                          </div>
+                          <p className="text-sm mb-1">{notif.mensaje}</p>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            {notif.cantidad_afectada && <div>Cantidad: {notif.cantidad_afectada}</div>}
+                            {notif.dias_restantes !== undefined && <div>Días restantes: {notif.dias_restantes}</div>}
+                            <div>Fecha: {new Date(notif.fecha_creacion).toLocaleDateString()}</div>
+                          </div>
                         </div>
-                        <p className="text-sm mb-1">{notif.mensaje}</p>
-                        <div className="text-xs text-muted-foreground space-y-1">
-                          {notif.cantidad_afectada && <div>Cantidad: {notif.cantidad_afectada}</div>}
-                          {notif.dias_restantes !== undefined && <div>Días restantes: {notif.dias_restantes}</div>}
-                          <div>Fecha: {new Date(notif.fecha_creacion).toLocaleDateString()}</div>
+                        
+                        <div className="flex space-x-2 ml-4">
+                          {!notif.leida && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleMarkAsRead(notif.id_notificacion)}
+                            >
+                              Marcar leída
+                            </Button>
+                          )}
                         </div>
                       </div>
-                      
-                      <div className="flex space-x-2 ml-4">
-                        {!notif.leida && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleMarkAsRead(notif.id_notificacion)}
-                          >
-                            Marcar leída
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </AlertDescription>
-                </div>
-              </Alert>
-            ))
+                    </AlertDescription>
+                  </div>
+                </Alert>
+              ))}
+              <TablePagination
+                currentPage={allPagination.currentPage}
+                totalPages={allPagination.totalPages}
+                totalItems={allPagination.totalItems}
+                itemsPerPage={allPagination.itemsPerPage}
+                onPageChange={allPagination.setCurrentPage}
+                onItemsPerPageChange={allPagination.setItemsPerPage}
+              />
+            </>
           )}
         </TabsContent>
 
-        <TabsContent value="high">
-          {filteredNotificaciones.filter(n => n.semaforo === 'ROJO' || n.tipo === 'VENCIDO').map((notif) => (
-            <Alert key={notif.id_notificacion} className={getAlertColor(notif.tipo, notif.semaforo)}>
-              {getAlertIcon(notif.tipo)}
-              <AlertDescription>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="font-semibold">{notif.nombre_insumo || notif.titulo}</div>
-                    <div className="text-sm">{notif.mensaje}</div>
+        <TabsContent value="high" className="space-y-4">
+          {highPriorityAlerts.length === 0 ? (
+            <Card>
+              <CardContent className="pt-8 text-center">
+                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">¡Sin alertas de alta prioridad!</h3>
+                <p className="text-muted-foreground">No hay alertas críticas en este momento.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {highPagination.paginatedItems.map((notif) => (
+                <Alert 
+                  key={notif.id_notificacion} 
+                  className={`${getAlertColor(notif.tipo, notif.semaforo)} ${
+                    notif.leida ? 'opacity-60' : ''
+                  }`}
+                >
+                  {getAlertIcon(notif.tipo)}
+                  <div className="flex-1">
+                    <AlertDescription>
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="font-semibold">{notif.nombre_insumo || notif.titulo}</span>
+                            <Badge variant={getPriorityBadge(notif.tipo, notif.semaforo)} className="text-xs">
+                              {notif.semaforo || notif.tipo}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {notif.tipo.replace('_', ' ')}
+                            </Badge>
+                          </div>
+                          <p className="text-sm mb-1">{notif.mensaje}</p>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            {notif.cantidad_afectada && <div>Cantidad: {notif.cantidad_afectada}</div>}
+                            {notif.dias_restantes !== undefined && <div>Días restantes: {notif.dias_restantes}</div>}
+                            <div>Fecha: {new Date(notif.fecha_creacion).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex space-x-2 ml-4">
+                          {!notif.leida && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleMarkAsRead(notif.id_notificacion)}
+                            >
+                              Marcar leída
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </AlertDescription>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => handleMarkAsRead(notif.id_notificacion)}>
-                    Marcar leída
-                  </Button>
-                </div>
-              </AlertDescription>
-            </Alert>
-          ))}
+                </Alert>
+              ))}
+              <TablePagination
+                currentPage={highPagination.currentPage}
+                totalPages={highPagination.totalPages}
+                totalItems={highPagination.totalItems}
+                itemsPerPage={highPagination.itemsPerPage}
+                onPageChange={highPagination.setCurrentPage}
+                onItemsPerPageChange={highPagination.setItemsPerPage}
+              />
+            </>
+          )}
         </TabsContent>
 
-        <TabsContent value="expiring">
-          {filteredNotificaciones.filter(n => n.tipo === 'VENCIMIENTO_PROXIMO' || n.tipo === 'USAR_HOY').map((notif) => (
-            <Alert key={notif.id_notificacion} className={getAlertColor(notif.tipo, notif.semaforo)}>
-              <Calendar className="h-4 w-4" />
-              <AlertDescription>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="font-semibold">{notif.nombre_insumo || notif.titulo}</div>
-                    <div className="text-sm">{notif.mensaje}</div>
-                    {notif.dias_restantes !== undefined && (
-                      <div className="text-xs text-muted-foreground">Días restantes: {notif.dias_restantes}</div>
-                    )}
+        <TabsContent value="expiring" className="space-y-4">
+          {expiringAlerts.length === 0 ? (
+            <Card>
+              <CardContent className="pt-8 text-center">
+                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">¡Sin productos por vencer!</h3>
+                <p className="text-muted-foreground">No hay productos próximos a vencer.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {expiringPagination.paginatedItems.map((notif) => (
+                <Alert 
+                  key={notif.id_notificacion} 
+                  className={`${getAlertColor(notif.tipo, notif.semaforo)} ${
+                    notif.leida ? 'opacity-60' : ''
+                  }`}
+                >
+                  <Calendar className="h-4 w-4" />
+                  <div className="flex-1">
+                    <AlertDescription>
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="font-semibold">{notif.nombre_insumo || notif.titulo}</span>
+                            <Badge variant={getPriorityBadge(notif.tipo, notif.semaforo)} className="text-xs">
+                              {notif.semaforo || notif.tipo}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {notif.tipo.replace('_', ' ')}
+                            </Badge>
+                          </div>
+                          <p className="text-sm mb-1">{notif.mensaje}</p>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            {notif.cantidad_afectada && <div>Cantidad: {notif.cantidad_afectada}</div>}
+                            {notif.dias_restantes !== undefined && <div>Días restantes: {notif.dias_restantes}</div>}
+                            <div>Fecha: {new Date(notif.fecha_creacion).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex space-x-2 ml-4">
+                          {!notif.leida && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleMarkAsRead(notif.id_notificacion)}
+                            >
+                              Marcar leída
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </AlertDescription>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => handleMarkAsRead(notif.id_notificacion)}>
-                    Marcar leída
-                  </Button>
-                </div>
-              </AlertDescription>
-            </Alert>
-          ))}
+                </Alert>
+              ))}
+              <TablePagination
+                currentPage={expiringPagination.currentPage}
+                totalPages={expiringPagination.totalPages}
+                totalItems={expiringPagination.totalItems}
+                itemsPerPage={expiringPagination.itemsPerPage}
+                onPageChange={expiringPagination.setCurrentPage}
+                onItemsPerPageChange={expiringPagination.setItemsPerPage}
+              />
+            </>
+          )}
         </TabsContent>
 
-        <TabsContent value="stock">
-          {filteredNotificaciones.filter(n => n.tipo === 'STOCK_CRITICO').map((notif) => (
-            <Alert key={notif.id_notificacion} className="border-orange-200 bg-orange-50">
-              <Package className="h-4 w-4" />
-              <AlertDescription>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="font-semibold">{notif.nombre_insumo || notif.titulo}</div>
-                    <div className="text-sm">{notif.mensaje}</div>
-                    {notif.cantidad_afectada && (
-                      <div className="text-xs text-muted-foreground">Cantidad: {notif.cantidad_afectada}</div>
-                    )}
+        <TabsContent value="stock" className="space-y-4">
+          {stockAlerts.length === 0 ? (
+            <Card>
+              <CardContent className="pt-8 text-center">
+                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">¡Stock en buen estado!</h3>
+                <p className="text-muted-foreground">No hay alertas de stock crítico.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {stockPagination.paginatedItems.map((notif) => (
+                <Alert 
+                  key={notif.id_notificacion} 
+                  className={`border-orange-200 bg-orange-50 ${
+                    notif.leida ? 'opacity-60' : ''
+                  }`}
+                >
+                  <Package className="h-4 w-4" />
+                  <div className="flex-1">
+                    <AlertDescription>
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="font-semibold">{notif.nombre_insumo || notif.titulo}</span>
+                            <Badge variant="secondary" className="text-xs">
+                              STOCK BAJO
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {notif.tipo.replace('_', ' ')}
+                            </Badge>
+                          </div>
+                          <p className="text-sm mb-1">{notif.mensaje}</p>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            {notif.cantidad_afectada && <div>Cantidad: {notif.cantidad_afectada}</div>}
+                            <div>Fecha: {new Date(notif.fecha_creacion).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex space-x-2 ml-4">
+                          {!notif.leida && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleMarkAsRead(notif.id_notificacion)}
+                            >
+                              Marcar leída
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </AlertDescription>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => handleMarkAsRead(notif.id_notificacion)}>
-                    Marcar leída
-                  </Button>
-                </div>
-              </AlertDescription>
-            </Alert>
-          ))}
+                </Alert>
+              ))}
+              <TablePagination
+                currentPage={stockPagination.currentPage}
+                totalPages={stockPagination.totalPages}
+                totalItems={stockPagination.totalItems}
+                itemsPerPage={stockPagination.itemsPerPage}
+                onPageChange={stockPagination.setCurrentPage}
+                onItemsPerPageChange={stockPagination.setItemsPerPage}
+              />
+            </>
+          )}
         </TabsContent>
       </Tabs>
     </div>

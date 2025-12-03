@@ -11,6 +11,7 @@ import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Textarea } from "./ui/textarea";
 import { API_BASE_URL } from "../constants";
+import { TablePagination, usePagination } from "./ui/table-pagination";
 
 interface Ingredient {
   id: number;
@@ -237,6 +238,17 @@ const handleSubmit = async (e: React.FormEvent) => {
     const matchesCategory = selectedCategory === "all" || ingredient.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  // Paginación
+  const {
+    currentPage,
+    setCurrentPage,
+    itemsPerPage,
+    setItemsPerPage,
+    totalPages,
+    totalItems,
+    paginatedItems: paginatedIngredients,
+  } = usePagination(filteredIngredients, 10);
 
   const getStockStatus = (ingredient: Ingredient) => {
     
@@ -488,7 +500,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredIngredients.map((ingredient) => {
+          {paginatedIngredients.map((ingredient) => {
             const status = getStockStatus(ingredient); // Se mantiene la lógica de estado (por stock
             
             return (
@@ -549,6 +561,16 @@ const handleSubmit = async (e: React.FormEvent) => {
         </TableBody>
       </Table>
     </div>
+    
+    {/* Paginación */}
+    <TablePagination
+      currentPage={currentPage}
+      totalPages={totalPages}
+      totalItems={totalItems}
+      itemsPerPage={itemsPerPage}
+      onPageChange={setCurrentPage}
+      onItemsPerPageChange={setItemsPerPage}
+    />
   </CardContent>
 </Card>
     </div>

@@ -179,7 +179,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.pendingOrders}</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground mt-1">
               Órdenes de compra esperando aprobación o entrega.
             </p>
           </CardContent>
@@ -193,7 +193,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.monthlyWaste}%</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground mt-1">
               Respecto al total de insumos del mes anterior.
             </p>
           </CardContent>
@@ -207,7 +207,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.stockCriticoCount}</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground mt-1">
               Insumos con niveles de stock bajos.
             </p>
           </CardContent>
@@ -239,9 +239,9 @@ export function Dashboard() {
                       alertType === 'expiry' ? 'text-red-600' : 'text-orange-600'
                     }`} />
                     <AlertDescription>
-                      <div className="flex justify-between items-center">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
                         <span className="font-medium">{alerta.nombre_insumo || alerta.titulo}</span>
-                        <Badge variant={alertType === 'expiry' ? 'destructive' : 'secondary'}>
+                        <Badge variant={alertType === 'expiry' ? 'destructive' : 'secondary'} className="w-fit">
                           {getAlertBadgeText(alerta)}
                         </Badge>
                       </div>

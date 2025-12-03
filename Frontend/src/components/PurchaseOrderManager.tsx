@@ -12,6 +12,7 @@ import { Separator } from "./ui/separator";
 import { Plus, Search, MoreHorizontal, Trash2, Edit } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { API_BASE_URL } from '../constants';
+import { TablePagination, usePagination } from "./ui/table-pagination";
 
 // --- CONFIGURACIÓN DE URL UNIFICADA ---
 const ORDEN_COMPRA_API_URL = `${API_BASE_URL}/v1/ordenes_compra`;
@@ -555,6 +556,17 @@ export function PurchaseOrderManager() {
     (order.nombre_proveedor || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Paginación
+  const {
+    currentPage,
+    setCurrentPage,
+    itemsPerPage,
+    setItemsPerPage,
+    totalPages,
+    totalItems,
+    paginatedItems: paginatedOrders,
+  } = usePagination(filteredOrders, 9);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -803,7 +815,7 @@ export function PurchaseOrderManager() {
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredOrders.map((order) => (
+        {paginatedOrders.map((order) => (
           <Card key={order.id_orden} className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex justify-between items-start">
@@ -836,6 +848,17 @@ export function PurchaseOrderManager() {
           </Card>
         ))}
       </div>
+
+      {/* Paginación */}
+      <TablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
+        onItemsPerPageChange={setItemsPerPage}
+        itemsPerPageOptions={[9, 18, 27, 45]}
+      />
 
       {/* Modal para ver insumos de la orden */}
       <Dialog open={isViewInsumosOpen} onOpenChange={setIsViewInsumosOpen}>

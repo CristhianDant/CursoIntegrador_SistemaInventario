@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit, Shield, Mail, Activity, X, Loader2, CheckCircle, Clock, Ban, UserCheck } from "lucide-react";
+import { Plus, Search, Edit, Shield, Mail, X, Loader2, CheckCircle, Ban, UserCheck, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "./ui/button";
 import { useAuth } from "../context/AuthContext";
 import { Input } from "./ui/input";
@@ -11,9 +11,11 @@ import { Label } from "./ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Checkbox } from "./ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { UserSessionModal } from "./UserSessionModal";
+
 import { API_BASE_URL } from "../constants";
 import { toast } from "sonner";
+import { TablePagination, usePagination } from "./ui/table-pagination";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 
 interface Permission {
   id_permiso: number;
@@ -85,8 +87,7 @@ export function UserManager() {
   const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<User | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
-  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
-  const [selectedUserForSessions, setSelectedUserForSessions] = useState("");
+
   const [userPermissions, setUserPermissions] = useState<number[]>([]);
   const [rolePermissions, setRolePermissions] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -152,6 +153,28 @@ export function UserManager() {
     const fullName = `${user.nombre} ${user.apellidos}`.toLowerCase();
     return fullName.includes(searchTerm.toLowerCase()) || user.email.toLowerCase().includes(searchTerm.toLowerCase());
   });
+
+  // Paginación para usuarios
+  const {
+    currentPage: userCurrentPage,
+    setCurrentPage: setUserCurrentPage,
+    itemsPerPage: userItemsPerPage,
+    setItemsPerPage: setUserItemsPerPage,
+    totalPages: userTotalPages,
+    totalItems: userTotalItems,
+    paginatedItems: paginatedUsers,
+  } = usePagination(filteredUsers, 10);
+
+  // Paginación para roles
+  const {
+    currentPage: roleCurrentPage,
+    setCurrentPage: setRoleCurrentPage,
+    itemsPerPage: roleItemsPerPage,
+    setItemsPerPage: setRoleItemsPerPage,
+    totalPages: roleTotalPages,
+    totalItems: roleTotalItems,
+    paginatedItems: paginatedRoles,
+  } = usePagination(roles, 10);
 
   const groupedPermissions = permissions.reduce((acc, permission) => {
     if (!acc[permission.modulo]) acc[permission.modulo] = [];
@@ -396,57 +419,43 @@ export function UserManager() {
 
   const handleManagePermissions = async (user: User) => {
     setSelectedUserForPermissions(user);
-    try {
-      const response = await fetch(`${API_BASE_URL}/v1/usuario-permisos/${user.id_user}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUserPermissions(data.success && data.data ? data.data.map((p: any) => p.id_permiso) : []);
-      } else {
-        console.error('Error al cargar permisos del usuario:', await response.text());
-        setUserPermissions([]);
+    // Los permisos se obtienen de los roles del usuario
+    // Cargar permisos de cada rol del usuario
+    const allPermissions: number[] = [];
+    for (const role of user.roles || []) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/v1/roles/${role.id_rol}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data?.permisos) {
+            data.data.permisos.forEach((p: any) => {
+              if (!allPermissions.includes(p.id_permiso)) {
+                allPermissions.push(p.id_permiso);
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Error al cargar permisos del rol ${role.nombre_rol}:`, error);
       }
-    } catch (error) {
-      console.error('Error de conexión al cargar permisos del usuario:', error);
-      setUserPermissions([]);
     }
+    setUserPermissions(allPermissions);
     setIsPermissionsModalOpen(true);
   };
 
-  const handleSaveUserPermissions = async () => {
-    if (!selectedUserForPermissions) return;
-    try {
-      const response = await fetch(`${API_BASE_URL}/v1/usuario-permisos/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id_user: selectedUserForPermissions.id_user,
-          permisos: userPermissions
-        })
-      });
-      if (response.ok) {
-        console.log('Permisos actualizados correctamente');
-        setIsPermissionsModalOpen(false);
-        setSelectedUserForPermissions(null);
-        setUserPermissions([]);
-      } else console.error('Error al guardar permisos:', await response.text());
-    } catch (error) { console.error('Error de conexión al guardar permisos:', error); }
-  };
-
   const handleUserPermissionToggle = (permissionId: number, checked: boolean) => {
-    setUserPermissions(prev => checked ? [...prev, permissionId] : prev.filter(id => id !== permissionId));
+    // Solo lectura - los permisos se gestionan desde los roles
+    toast.info("Los permisos se asignan a través de los roles del usuario");
   };
 
   const handleRolePermissionToggle = (permissionId: number, checked: boolean) => {
     setRolePermissions(prev => checked ? [...prev, permissionId] : prev.filter(id => id !== permissionId));
   };
 
-  const handleViewSessions = (userName: string) => {
-    setSelectedUserForSessions(userName);
-    setIsSessionModalOpen(true);
-  };
+
 
   return (
     <div className="space-y-6">
@@ -498,7 +507,7 @@ export function UserManager() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers.map((user) => (
+                  {paginatedUsers.map((user) => (
                     <TableRow key={user.id_user}>
                       <TableCell><div className="font-medium">{user.nombre} {user.apellidos}</div></TableCell>
                       <TableCell><div className="flex items-center text-sm"><Mail className="h-3 w-3 mr-1.5" />{user.email}</div></TableCell>
@@ -516,7 +525,6 @@ export function UserManager() {
                       <TableCell><Badge variant={user.anulado ? "destructive" : "outline"}>{user.anulado ? "Anulado" : "Activo"}</Badge></TableCell>
                       <TableCell className="text-right">
                         <div className="flex space-x-2 justify-end">
-                          <Button variant="outline" size="icon" onClick={() => handleViewSessions(user.nombre)} title="Ver sesiones"><Activity className="h-4 w-4" /></Button>
                           {canEditUsuarios && (
                             <>
                               <Button variant="outline" size="icon" onClick={() => handleManagePermissions(user)} title="Gestionar permisos"><Shield className="h-4 w-4" /></Button>
@@ -537,6 +545,14 @@ export function UserManager() {
                   ))}
                 </TableBody>
               </Table>
+              <TablePagination
+                currentPage={userCurrentPage}
+                totalPages={userTotalPages}
+                onPageChange={setUserCurrentPage}
+                totalItems={userTotalItems}
+                itemsPerPage={userItemsPerPage}
+                onItemsPerPageChange={setUserItemsPerPage}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -827,39 +843,109 @@ export function UserManager() {
         </DialogContent>
       </Dialog>
 
-      <UserSessionModal isOpen={isSessionModalOpen} onClose={() => setIsSessionModalOpen(false)} username={selectedUserForSessions} />
-
       <Dialog open={isPermissionsModalOpen} onOpenChange={setIsPermissionsModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Gestionar Permisos - {selectedUserForPermissions?.nombre} {selectedUserForPermissions?.apellidos}</DialogTitle>
-            <DialogDescription>Selecciona los permisos individuales que tendrá este usuario.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              Permisos del Usuario
+            </DialogTitle>
+            <DialogDescription>
+              Usuario: <span className="font-medium text-foreground">{selectedUserForPermissions?.nombre} {selectedUserForPermissions?.apellidos}</span>
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-6">
-            {Object.entries(groupedPermissions).map(([module, modulePermissions]) => (
-              <div key={module} className="space-y-3">
-                <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">{module}</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {modulePermissions.map((permission) => (
-                    <div key={permission.id_permiso} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`permission-${permission.id_permiso}`}
-                        checked={userPermissions.includes(permission.id_permiso)}
-                        onCheckedChange={(checked: boolean | 'indeterminate') => handleUserPermissionToggle(permission.id_permiso, checked as boolean)}
-                      />
-                      <Label htmlFor={`permission-${permission.id_permiso}`} className="text-sm font-normal cursor-pointer">
-                        <div className="font-medium">{permission.accion}</div>
-                        <div className="text-xs text-muted-foreground">{permission.descripcion_permiso}</div>
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+          
+          {/* Info sobre roles */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+            <p className="text-blue-800">
+              <strong>ℹ️ Nota:</strong> Los permisos se asignan a través de los roles. 
+              Para modificar permisos, edita los roles del usuario o los permisos del rol.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1">
+              <span className="text-blue-700">Roles asignados:</span>
+              {selectedUserForPermissions?.roles?.length ? (
+                selectedUserForPermissions.roles.map(role => (
+                  <Badge key={role.id_rol} variant="secondary" className="text-xs">
+                    {role.nombre_rol}
+                  </Badge>
+                ))
+              ) : (
+                <span className="text-muted-foreground">Sin roles asignados</span>
+              )}
+            </div>
           </div>
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setIsPermissionsModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveUserPermissions}>Guardar Permisos</Button>
+
+          {/* Resumen rápido */}
+          <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg text-sm">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span><strong>{userPermissions.length}</strong> permisos activos</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">de {permissions.length} disponibles</span>
+            </div>
+          </div>
+
+          {/* Lista de permisos (solo lectura) */}
+          <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+            {Object.entries(groupedPermissions).map(([module, modulePermissions]) => {
+              const modulePermissionIds = modulePermissions.map(p => p.id_permiso);
+              const selectedInModule = modulePermissionIds.filter(id => userPermissions.includes(id)).length;
+              
+              if (selectedInModule === 0) return null; // Solo mostrar módulos con permisos activos
+              
+              return (
+                <Collapsible key={module} defaultOpen={true}>
+                  <div className="border rounded-lg">
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between p-3 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-90" />
+                          <span className="font-medium text-sm">{module}</span>
+                        </div>
+                        <Badge variant="default" className="text-xs bg-green-600">
+                          {selectedInModule} permiso{selectedInModule !== 1 ? 's' : ''}
+                        </Badge>
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="px-3 pb-3 pt-1 border-t bg-muted/20">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                          {modulePermissions
+                            .filter(permission => userPermissions.includes(permission.id_permiso))
+                            .map((permission) => (
+                            <div
+                              key={permission.id_permiso}
+                              className="flex items-start gap-2 p-2 rounded-md bg-green-50 border border-green-200"
+                            >
+                              <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm text-green-800">{permission.accion}</div>
+                                <div className="text-xs text-green-600 truncate">{permission.descripcion_permiso}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
+              );
+            })}
+            
+            {userPermissions.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Shield className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>Este usuario no tiene permisos asignados.</p>
+                <p className="text-sm">Asigna un rol al usuario para otorgarle permisos.</p>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex justify-end pt-4 border-t">
+            <Button type="button" variant="outline" onClick={() => setIsPermissionsModalOpen(false)}>
+              Cerrar
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

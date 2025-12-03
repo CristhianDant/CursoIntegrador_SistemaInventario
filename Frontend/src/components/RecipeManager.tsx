@@ -14,6 +14,7 @@ import { SearchableSelect } from "./ui/searchable-select";
 import { toast } from "sonner";
 import { API_BASE_URL } from "../constants"; 
 import { useAuth } from "../context/AuthContext"; 
+import { TablePagination, usePagination } from "./ui/table-pagination"; 
 
 const RECETAS_API_URL = `${API_BASE_URL}/v1/recetas`; 
 
@@ -356,6 +357,17 @@ export function RecipeManager() {
            code.toLowerCase().includes(searchLower);
   });
 
+  // Paginación
+  const {
+    currentPage,
+    setCurrentPage,
+    itemsPerPage,
+    setItemsPerPage,
+    totalPages,
+    totalItems,
+    paginatedItems: paginatedRecipes,
+  } = usePagination(filteredRecipes, 9);
+
   const getEstadoBadgeVariant = (estado: string) => {
     return estado === 'ACTIVA' ? 'default' : 'secondary';
   };
@@ -404,8 +416,9 @@ export function RecipeManager() {
           No se encontraron recetas
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredRecipes.map((recipe) => (
+          {paginatedRecipes.map((recipe) => (
             <Card key={recipe.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
@@ -444,8 +457,8 @@ export function RecipeManager() {
                 {/* Rendimiento y Costo */}
                 <div className="space-y-2 pt-2 border-t">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Rendimiento:</span>
-                    <span className="font-medium">{recipe.rendimiento_producto_terminado} unidades</span>
+                    <span className="text-muted-foreground">Por lote produce:</span>
+                    <span className="font-medium">{recipe.rendimiento_producto_terminado} {recipe.rendimiento_producto_terminado === 1 ? 'unidad' : 'unidades'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm font-semibold">Costo Estimado:</span>
@@ -486,6 +499,18 @@ export function RecipeManager() {
             </Card>
           ))}
         </div>
+
+        {/* Paginación */}
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={setItemsPerPage}
+          itemsPerPageOptions={[9, 18, 27, 45]}
+        />
+        </>
       )}
 
       {/* Modal Ver Detalles de Receta */}
@@ -519,8 +544,8 @@ export function RecipeManager() {
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
                   <Package className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground">Rendimiento</p>
-                  <p className="font-semibold">{selectedRecipe.rendimiento_producto_terminado} unidades</p>
+                  <p className="text-xs text-muted-foreground">Por lote</p>
+                  <p className="font-semibold">{selectedRecipe.rendimiento_producto_terminado} uds</p>
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
                   <Clock className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
@@ -711,11 +736,12 @@ export function RecipeManager() {
 
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="rendimiento">Rendimiento (Unidades)</Label>
+                <Label htmlFor="rendimiento">Unidades por lote</Label>
                 <Input
                   id="rendimiento"
                   type="number"
                   min="1"
+                  placeholder="¿Cuántas unidades produce 1 lote?"
                   value={formData.rendimiento_producto_terminado || ""}
                   onChange={(e) => setFormData(prev => ({ ...prev, rendimiento_producto_terminado: parseInt(e.target.value) }))}
                 />

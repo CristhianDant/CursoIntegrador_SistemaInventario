@@ -11,9 +11,29 @@ interface TypewriterSplashProps {
 export function TypewriterSplash({ onAnimationEnd, typingDuration = 3000, blinkDuration = 1000 }: TypewriterSplashProps) {
   
   const [isFading, setIsFading] = useState(false);
+  const [displayedText, setDisplayedText] = useState("");
+  
+  const fullText = "Bienvenido al Sistema de Gestión";
   
   // Duración total antes de que el formulario aparezca
   const totalDuration = typingDuration + blinkDuration;
+
+  // Efecto de máquina de escribir
+  useEffect(() => {
+    const charDelay = typingDuration / fullText.length;
+    let currentIndex = 0;
+    
+    const typingInterval = setInterval(() => {
+      if (currentIndex < fullText.length) {
+        setDisplayedText(fullText.slice(0, currentIndex + 1));
+        currentIndex++;
+      } else {
+        clearInterval(typingInterval);
+      }
+    }, charDelay);
+
+    return () => clearInterval(typingInterval);
+  }, [typingDuration]);
 
   useEffect(() => {
     // 1. Inicia el desvanecimiento del splash (fade-out)
@@ -40,22 +60,9 @@ export function TypewriterSplash({ onAnimationEnd, typingDuration = 3000, blinkD
     >
       <div className="text-center p-6 bg-white/70 rounded-xl shadow-2xl backdrop-blur-sm">
         
-        {/*
-          APLICAMOS EL EFECTO DE MÁQUINA DE ESCRIBIR
-          El texto es: "Bienvenido al Sistema de Gestión" (29 caracteres, ajusta --type-steps si lo cambias)
-          
-          Nota: En el CSS de ejemplo yo usé 25, si usas este texto, debes cambiarlo a 29
-          en el index.css: --type-steps: 29; 
-        */}
-        <h1 
-          className="typewriter text-3xl md:text-4xl font-mono font-bold text-orange-700 mx-auto"
-          style={{ 
-            // Esto es importante: asegurar que la animación del cursor empiece
-            // justo después de que la escritura termine.
-            animationDelay: `${typingDuration / 1000}s, 0s` 
-          }}
-        >
-          Bienvenido al Sistema de Gestión
+        <h1 className="text-3xl md:text-4xl font-mono font-bold text-orange-700">
+          {displayedText}
+          <span className="animate-pulse border-r-4 border-orange-600 ml-1">&nbsp;</span>
         </h1>
         
       </div>

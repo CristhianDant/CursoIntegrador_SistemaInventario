@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Search, Edit, Trash2, Package, TrendingUp, Calendar, DollarSign, Percent, Gift, AlertTriangle } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, TrendingUp, Calendar, DollarSign, Percent, Gift, AlertTriangle, ChefHat, Loader2, CheckCircle, XCircle, FileWarning, TrendingDown } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -13,12 +13,53 @@ import { Textarea } from "./ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { API_BASE_URL } from "../constants";
 import { useAuth } from "../context/AuthContext";
+import { TablePagination, usePagination } from "./ui/table-pagination";
 
 // Interfaces
 interface Recipe {
   id_receta: number;
   nombre_receta: string;
   costo_estimado: number;
+}
+
+// Interfaces para el sistema de producción
+interface RecetaCompleta {
+  id_receta: number;
+  codigo_receta: string;
+  nombre_receta: string;
+  descripcion: string;
+  rendimiento_producto_terminado: number;
+  costo_estimado: number;
+  detalles: RecetaDetalle[];
+}
+
+interface RecetaDetalle {
+  id_receta_detalle: number;
+  id_insumo: number;
+  cantidad: number;
+  costo_unitario: number;
+  costo_total: number;
+  es_opcional: boolean;
+  observaciones: string | null;
+}
+
+interface InsumoRequerido {
+  id_insumo: number;
+  codigo_insumo: string;
+  nombre_insumo: string;
+  unidad_medida: string;
+  cantidad_requerida: number;
+  stock_disponible: number;
+  es_suficiente: boolean;
+}
+
+interface ValidacionStock {
+  id_receta: number;
+  nombre_receta: string;
+  cantidad_batch: number;
+  puede_producir: boolean;
+  insumos: InsumoRequerido[];
+  mensaje: string;
 }
 
 interface ProductMovement {
@@ -69,6 +110,54 @@ interface FinishedProduct {
     movements: ProductMovement[];
 }
 
+// Interface para Insumos (para mermas)
+interface Insumo {
+    id_insumo: number;
+    codigo: string;
+    nombre: string;
+    categoria: string;
+    stock_actual: number;
+    stock_minimo: number;
+    unidad_medida: string;
+    precio_promedio: number;
+}
+
+// Interface para Mermas
+interface Merma {
+    id_merma: number;
+    numero_registro: string;
+    tipo: 'VENCIMIENTO' | 'HONGEADO' | 'DAÑO' | 'PRODUCCION';
+    causa: string;
+    cantidad: number;
+    costo_unitario: number;
+    costo_total: number;
+    fecha_caso: string;
+    id_insumo: number | null;
+    id_producto: number | null;
+    id_lote: number | null;
+    id_user_responsable: number;
+    observacion: string | null;
+    estado: string;
+    anulado: boolean;
+    // Campos para mostrar nombres (se agregan en frontend)
+    nombre_producto?: string;
+    nombre_insumo?: string;
+}
+
+interface MermaFormData {
+    tipo: string;
+    tipoItem: 'producto' | 'insumo';
+    causa: string;
+    cantidad: number;
+    costo_unitario: number;
+    costo_total: number;
+    fecha_caso: string;
+    id_producto: number | null;
+    id_insumo: number | null;
+    id_user_responsable: number;
+    observacion: string;
+}
+
 interface FormData {
     // ID del producto (para edición)
     id?: number; 
@@ -87,16 +176,6 @@ interface FormData {
     anulado?: boolean;
 }
 
-// Mock data de recetas disponibles (fallback si la API falla)
-const availableRecipes = [
-  { id_receta: 1, nombre_receta: "Pastel de Chocolate Clásico", costo_estimado: 0.71 },
-  { id_receta: 2, nombre_receta: "Galletas de Mantequilla", costo_estimado: 0.08 },
-  { id_receta: 3, nombre_receta: "Pan Integral", costo_estimado: 0.35 },
-  { id_receta: 4, nombre_receta: "Cheesecake de Fresa", costo_estimado: 1.25 },
-];
-
-
- 
 // Sistema de promociones automáticas
 const generatePromotionSuggestions = (products: FinishedProduct[]): PromotionSuggestion[] => {
   const suggestions: PromotionSuggestion[] = [];
@@ -178,12 +257,28 @@ const isComplementaryCategory = (category1: string, category2: string): boolean 
   );
 };
 
+// Función para formatear números de forma amigable (sin decimales innecesarios)
+const formatNumber = (value: number | string | null | undefined): string => {
+  // Convertir a número si es string
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  
+  // Validar que sea un número válido
+  if (num === null || num === undefined || isNaN(Number(num))) return '0';
+  
+  // Si es entero, mostrar sin decimales
+  if (Number.isInteger(num)) return num.toString();
+  
+  // Si tiene decimales, mostrar máximo 2 y eliminar ceros finales
+  const formatted = Number(num).toFixed(2);
+  return parseFloat(formatted).toString();
+};
+
 export function ProductManager() {
   const { canWrite } = useAuth();
   const canEditProducts = canWrite('PRODUCTOS');
   
   const [products, setProducts] = useState<FinishedProduct[]>([]);
-  const [recipes, setRecipes] = useState<Recipe[]>(availableRecipes); // Estado para recetas cargadas de la API
+  const [recipes, setRecipes] = useState<Recipe[]>([]); // Recetas cargadas desde la API
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -195,6 +290,36 @@ export function ProductManager() {
   const [movementData, setMovementData] = useState<Partial<ProductMovement>>({});
   const [promotionSuggestions, setPromotionSuggestions] = useState<PromotionSuggestion[]>([]);
   const [selectedPromotion, setSelectedPromotion] = useState<PromotionSuggestion | null>(null);
+  
+  // Estados para el sistema de producción
+  const [isProductionDialogOpen, setIsProductionDialogOpen] = useState(false);
+  const [selectedRecipeId, setSelectedRecipeId] = useState<number | null>(null);
+  const [selectedRecipeDetails, setSelectedRecipeDetails] = useState<RecetaCompleta | null>(null);
+  const [cantidadBatch, setCantidadBatch] = useState<number>(1);
+  const [validacionStock, setValidacionStock] = useState<ValidacionStock | null>(null);
+  const [loadingValidation, setLoadingValidation] = useState(false);
+  const [loadingProduction, setLoadingProduction] = useState(false);
+
+  // Estados para el sistema de mermas
+  const [activeTab, setActiveTab] = useState("productos");
+  const [mermas, setMermas] = useState<Merma[]>([]);
+  const [insumos, setInsumos] = useState<Insumo[]>([]);
+  const [isMermaDialogOpen, setIsMermaDialogOpen] = useState(false);
+  const [mermaFormData, setMermaFormData] = useState<MermaFormData>({
+    tipo: 'PRODUCCION',
+    tipoItem: 'insumo',
+    causa: '',
+    cantidad: 0,
+    costo_unitario: 0,
+    costo_total: 0,
+    fecha_caso: new Date().toISOString().split('T')[0],
+    id_producto: null,
+    id_insumo: null,
+    id_user_responsable: 1,
+    observacion: ''
+  });
+  const [mermaSearchTerm, setMermaSearchTerm] = useState("");
+  const [selectedMermaTipo, setSelectedMermaTipo] = useState("all");
 
  const fetchProducts = async () => {
     try {
@@ -257,8 +382,9 @@ const fetchRecipes = async () => {
         });
 
         if (!response.ok) {
-            console.warn('Error al cargar recetas desde el servidor, usando datos por defecto.');
-            return; // Usa los mock data como fallback
+            console.error('Error al cargar recetas desde el servidor.');
+            toast.error('Error al cargar las recetas');
+            return;
         }
 
         const data = await response.json();
@@ -275,8 +401,64 @@ const fetchRecipes = async () => {
         }
 
     } catch (error) {
-        console.error("Fallo la carga de recetas. Usando datos por defecto:", error);
-        // Si hay error, mantiene los mock data
+        console.error("Error al cargar recetas:", error);
+        toast.error('Error de conexión al cargar recetas');
+    }
+};
+
+// Función para cargar mermas desde la API
+const fetchMermas = async () => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/v1/mermas/`, { 
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+            console.error('Error al cargar mermas desde el servidor.');
+            return;
+        }
+
+        const data = await response.json();
+        
+        if (data.success && Array.isArray(data.data)) {
+            setMermas(data.data);
+        }
+    } catch (error) {
+        console.error("Error al cargar mermas:", error);
+    }
+};
+
+// Función para cargar insumos desde la API (para mermas)
+const fetchInsumos = async () => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/v1/insumos/`, { 
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+            console.error('Error al cargar insumos desde el servidor.');
+            return;
+        }
+
+        const data = await response.json();
+        
+        if (data.success && Array.isArray(data.data)) {
+            const loadedInsumos: Insumo[] = data.data.map((i: any) => ({
+                id_insumo: i.id_insumo,
+                codigo: i.codigo,
+                nombre: i.nombre,
+                categoria: i.categoria || 'Sin categoría',
+                stock_actual: parseFloat(i.stock_actual || 0),
+                stock_minimo: parseFloat(i.stock_minimo || 0),
+                unidad_medida: i.unidad_medida,
+                precio_promedio: parseFloat(i.precio_promedio || 0),
+            }));
+            setInsumos(loadedInsumos);
+        }
+    } catch (error) {
+        console.error("Error al cargar insumos:", error);
     }
 };
 
@@ -284,12 +466,139 @@ useEffect(() => {
         // Llama a la función que realiza la petición a la API
         fetchProducts(); 
         fetchRecipes(); // Cargar recetas al montar el componente
+        fetchMermas(); // Cargar mermas al montar el componente
+        fetchInsumos(); // Cargar insumos al montar el componente (para mermas)
     }, []); // El array vacío '[]' es crucial para que se ejecute solo al inicio.
 
   // Generar sugerencias de promociones automáticamente
   useEffect(() => {
     setPromotionSuggestions(generatePromotionSuggestions(products));
   }, [products]);
+
+  // ============ FUNCIONES DE PRODUCCIÓN ============
+  
+  // Cargar detalles de una receta específica
+  const fetchRecipeDetails = async (recetaId: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/v1/recetas/${recetaId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (!response.ok) throw new Error('Error al cargar detalles de la receta');
+      
+      const data = await response.json();
+      if (data.success && data.data) {
+        setSelectedRecipeDetails(data.data);
+      }
+    } catch (error) {
+      console.error("Error cargando detalles de receta:", error);
+      toast.error("Error al cargar los detalles de la receta");
+    }
+  };
+
+  // Validar stock antes de producir
+  const validarStockProduccion = async () => {
+    if (!selectedRecipeId || cantidadBatch <= 0) {
+      toast.error("Selecciona una receta y cantidad válida");
+      return;
+    }
+
+    setLoadingValidation(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/v1/produccion/validar-stock?id_receta=${selectedRecipeId}&cantidad_batch=${cantidadBatch}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      if (!response.ok) throw new Error('Error al validar stock');
+
+      const data = await response.json();
+      if (data.success && data.data) {
+        setValidacionStock(data.data);
+        if (!data.data.puede_producir) {
+          toast.warning("Stock insuficiente para algunos insumos");
+        } else {
+          toast.success("¡Stock validado! Puedes ejecutar la producción");
+        }
+      }
+    } catch (error) {
+      console.error("Error validando stock:", error);
+      toast.error("Error al validar el stock disponible");
+    } finally {
+      setLoadingValidation(false);
+    }
+  };
+
+  // Ejecutar producción
+  const ejecutarProduccion = async () => {
+    if (!selectedRecipeId || !validacionStock?.puede_producir) {
+      toast.error("Debes validar el stock primero");
+      return;
+    }
+
+    setLoadingProduction(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/v1/produccion/ejecutar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id_receta: selectedRecipeId,
+          cantidad_batch: cantidadBatch,
+          id_user: 1, // TODO: Obtener del usuario logueado
+          observaciones: `Producción desde interfaz web`
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.data || 'Error al ejecutar producción');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        toast.success(`¡Producción exitosa! ${data.data.cantidad_producida} unidades producidas`);
+        await fetchProducts(); // Actualizar lista de productos
+        closeProductionDialog();
+      }
+    } catch (error: any) {
+      console.error("Error ejecutando producción:", error);
+      toast.error(error.message || "Error al ejecutar la producción");
+    } finally {
+      setLoadingProduction(false);
+    }
+  };
+
+  // Abrir dialog de producción
+  const openProductionDialogWithRecipe = () => {
+    setSelectedRecipeId(null);
+    setSelectedRecipeDetails(null);
+    setCantidadBatch(1);
+    setValidacionStock(null);
+    setIsProductionDialogOpen(true);
+  };
+
+  // Cerrar dialog de producción
+  const closeProductionDialog = () => {
+    setIsProductionDialogOpen(false);
+    setSelectedRecipeId(null);
+    setSelectedRecipeDetails(null);
+    setCantidadBatch(1);
+    setValidacionStock(null);
+  };
+
+  // Manejar selección de receta
+  const handleRecipeSelection = async (recetaId: string) => {
+    const id = parseInt(recetaId);
+    setSelectedRecipeId(id);
+    setValidacionStock(null);
+    await fetchRecipeDetails(id);
+  };
+
+  // ============ FIN FUNCIONES DE PRODUCCIÓN ============
 
   // Función para calcular el estado de un producto
   const getProductStatus = (product: FinishedProduct) => {
@@ -307,6 +616,17 @@ useEffect(() => {
     const matchesStatus = selectedStatus === "all" || productStatus === selectedStatus;
     return matchesSearch && matchesStatus;
   });
+
+  // Paginación
+  const {
+    currentPage,
+    setCurrentPage,
+    itemsPerPage,
+    setItemsPerPage,
+    totalPages,
+    totalItems,
+    paginatedItems: paginatedProducts,
+  } = usePagination(filteredProducts, 10);
 
   const generateBatchNumber = (recipeId: number) => {
     const today = new Date();
@@ -511,6 +831,237 @@ const handleEdit = (product: FinishedProduct) => {
     setIsDialogOpen(true);
   };
 
+  // ============ FUNCIONES DE MERMAS ============
+  
+  const generateMermaNumber = () => {
+    const now = new Date();
+    return `MRM-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+  };
+
+  const openMermaDialog = (product?: FinishedProduct, insumo?: Insumo) => {
+    if (insumo) {
+      setMermaFormData({
+        tipo: 'PRODUCCION',
+        tipoItem: 'insumo',
+        causa: '',
+        cantidad: 0,
+        costo_unitario: insumo.precio_promedio || 0,
+        costo_total: 0,
+        fecha_caso: new Date().toISOString().split('T')[0],
+        id_producto: null,
+        id_insumo: insumo.id_insumo,
+        id_user_responsable: 1,
+        observacion: ''
+      });
+    } else {
+      setMermaFormData({
+        tipo: product ? 'VENCIMIENTO' : 'PRODUCCION',
+        tipoItem: product ? 'producto' : 'insumo',
+        causa: '',
+        cantidad: 0,
+        costo_unitario: product?.precio_venta || 0,
+        costo_total: 0,
+        fecha_caso: new Date().toISOString().split('T')[0],
+        id_producto: product?.id_producto || null,
+        id_insumo: null,
+        id_user_responsable: 1,
+        observacion: ''
+      });
+    }
+    setIsMermaDialogOpen(true);
+  };
+
+  const handleMermaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const esInsumo = mermaFormData.tipoItem === 'insumo';
+    
+    if (esInsumo) {
+      // Validación para insumos
+      if (!mermaFormData.id_insumo || !mermaFormData.cantidad || mermaFormData.cantidad <= 0) {
+        toast.error("Selecciona un insumo y cantidad válida");
+        return;
+      }
+
+      const insumo = insumos.find(i => i.id_insumo === mermaFormData.id_insumo);
+      if (!insumo) {
+        toast.error("Insumo no encontrado");
+        return;
+      }
+
+      if (mermaFormData.cantidad > insumo.stock_actual) {
+        toast.error(`Stock insuficiente. Disponible: ${insumo.stock_actual}`);
+        return;
+      }
+
+      const costoTotal = (mermaFormData.cantidad || 0) * (mermaFormData.costo_unitario || 0);
+
+      const mermaData = {
+        numero_registro: generateMermaNumber(),
+        tipo: mermaFormData.tipo,
+        causa: mermaFormData.causa || `Merma de insumo por ${mermaFormData.tipo?.toLowerCase()}`,
+        cantidad: mermaFormData.cantidad,
+        costo_unitario: mermaFormData.costo_unitario,
+        costo_total: costoTotal,
+        fecha_caso: new Date().toISOString(),
+        id_insumo: mermaFormData.id_insumo,
+        id_producto: null,
+        id_lote: null,
+        id_user_responsable: mermaFormData.id_user_responsable || 1,
+        observacion: mermaFormData.observacion || null,
+        estado: 'REGISTRADO',
+        anulado: false
+      };
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/v1/mermas/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(mermaData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.data || 'Error al registrar la merma');
+        }
+
+        toast.success(`Merma registrada: ${mermaFormData.cantidad} ${insumo.unidad_medida} de ${insumo.nombre}`);
+        await fetchMermas();
+        await fetchInsumos(); // Actualizar stock de insumos
+        setIsMermaDialogOpen(false);
+        resetMermaForm();
+      } catch (error: any) {
+        console.error("Error al registrar merma de insumo:", error);
+        toast.error(error.message || "Error al registrar la merma");
+      }
+    } else {
+      // Validación para productos
+      if (!mermaFormData.id_producto || !mermaFormData.cantidad || mermaFormData.cantidad <= 0) {
+        toast.error("Selecciona un producto y cantidad válida");
+        return;
+      }
+
+      const producto = products.find(p => p.id_producto === mermaFormData.id_producto);
+      if (!producto) {
+        toast.error("Producto no encontrado");
+        return;
+      }
+
+      if (mermaFormData.cantidad > producto.stock_actual) {
+        toast.error(`Stock insuficiente. Disponible: ${producto.stock_actual}`);
+        return;
+      }
+
+      const costoTotal = (mermaFormData.cantidad || 0) * (mermaFormData.costo_unitario || 0);
+
+      const mermaData = {
+        numero_registro: generateMermaNumber(),
+        tipo: mermaFormData.tipo,
+        causa: mermaFormData.causa || `Merma por ${mermaFormData.tipo?.toLowerCase()}`,
+        cantidad: mermaFormData.cantidad,
+        costo_unitario: mermaFormData.costo_unitario,
+        costo_total: costoTotal,
+        fecha_caso: new Date().toISOString(),
+        id_insumo: null,
+        id_producto: mermaFormData.id_producto,
+        id_lote: null,
+        id_user_responsable: mermaFormData.id_user_responsable || 1,
+        observacion: mermaFormData.observacion || null,
+        estado: 'REGISTRADO',
+        anulado: false
+      };
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/v1/mermas/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(mermaData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.data || 'Error al registrar la merma');
+        }
+
+        toast.success(`Merma registrada: ${mermaFormData.cantidad} unidades de ${producto.nombre}`);
+        await fetchMermas();
+        await fetchProducts(); // Actualizar stock
+        setIsMermaDialogOpen(false);
+        resetMermaForm();
+      } catch (error: any) {
+        console.error("Error al registrar merma:", error);
+        toast.error(error.message || "Error al registrar la merma");
+      }
+    }
+  };
+
+  const resetMermaForm = () => {
+    setMermaFormData({
+      tipo: 'PRODUCCION',
+      tipoItem: 'insumo',
+      causa: '',
+      cantidad: 0,
+      costo_unitario: 0,
+      costo_total: 0,
+      fecha_caso: new Date().toISOString().split('T')[0],
+      id_producto: null,
+      id_insumo: null,
+      id_user_responsable: 1,
+      observacion: ''
+    });
+  };
+
+  const getMermaTipoColor = (tipo: string) => {
+    switch (tipo) {
+      case 'VENCIMIENTO': return 'bg-red-100 text-red-800';
+      case 'HONGEADO': return 'bg-yellow-100 text-yellow-800';
+      case 'DAÑO': return 'bg-orange-100 text-orange-800';
+      case 'PRODUCCION': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getMermaTipoLabel = (tipo: string) => {
+    switch (tipo) {
+      case 'VENCIMIENTO': return 'Vencimiento';
+      case 'HONGEADO': return 'Hongeado';
+      case 'DAÑO': return 'Daño';
+      case 'PRODUCCION': return 'Producción';
+      default: return tipo;
+    }
+  };
+
+  // Filtrar mermas
+  const filteredMermas = mermas.filter(merma => {
+    const matchesSearch = merma.numero_registro.toLowerCase().includes(mermaSearchTerm.toLowerCase()) ||
+                         merma.causa?.toLowerCase().includes(mermaSearchTerm.toLowerCase());
+    const matchesTipo = selectedMermaTipo === "all" || merma.tipo === selectedMermaTipo;
+    return matchesSearch && matchesTipo && !merma.anulado;
+  });
+
+  // Paginación de mermas
+  const {
+    currentPage: mermaCurrentPage,
+    setCurrentPage: setMermaCurrentPage,
+    itemsPerPage: mermaItemsPerPage,
+    setItemsPerPage: setMermaItemsPerPage,
+    totalPages: mermaTotalPages,
+    totalItems: mermaTotalItems,
+    paginatedItems: paginatedMermas,
+  } = usePagination(filteredMermas, 10);
+
+  // Estadísticas de mermas
+  const mermaStats = {
+    total: mermas.filter(m => !m.anulado).length,
+    porVencimiento: mermas.filter(m => m.tipo === 'VENCIMIENTO' && !m.anulado).length,
+    porHongeado: mermas.filter(m => m.tipo === 'HONGEADO' && !m.anulado).length,
+    porDano: mermas.filter(m => m.tipo === 'DAÑO' && !m.anulado).length,
+    porProduccion: mermas.filter(m => m.tipo === 'PRODUCCION' && !m.anulado).length,
+    costoTotal: mermas.filter(m => !m.anulado).reduce((sum, m) => sum + (m.costo_total || 0), 0),
+  };
+
+  // ============ FIN FUNCIONES DE MERMAS ============
+
   const activatePromotion = (promotion: PromotionSuggestion) => {
     setPromotionSuggestions(prev =>
       prev.map(p => p.id === promotion.id ? { ...p, isActive: true } : p)
@@ -562,25 +1113,48 @@ const handleEdit = (product: FinishedProduct) => {
           <h2 className="text-2xl font-bold">Productos Terminados</h2>
           <p className="text-muted-foreground">Gestiona los productos elaborados con tus recetas</p>
         </div>
-        
-        <div className="flex space-x-2">
-          <Button onClick={openPromotionDialog} variant="outline" className="relative">
-            <Gift className="h-4 w-4 mr-2" />
-            Promociones
-            {stats.activeSuggestions > 0 && (
-              <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                {stats.activeSuggestions}
-              </Badge>
-            )}
-          </Button>
-          {canEditProducts && (
-            <Button onClick={openAddDialog}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Producto
-            </Button>
-          )}
-        </div>
       </div>
+
+      {/* Tabs para Productos y Mermas */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+          <TabsTrigger value="productos" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Productos
+          </TabsTrigger>
+          <TabsTrigger value="mermas" className="flex items-center gap-2">
+            <FileWarning className="h-4 w-4" />
+            Mermas
+            {mermaStats.total > 0 && (
+              <Badge variant="secondary" className="ml-1 text-xs">{mermaStats.total}</Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Tab de Productos */}
+        <TabsContent value="productos" className="space-y-6 mt-6">
+          {/* Botones de acción de productos */}
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={openProductionDialogWithRecipe}>
+              <ChefHat className="h-4 w-4 mr-2" />
+              Producir
+            </Button>
+            <Button onClick={openPromotionDialog} variant="outline" className="relative">
+              <Gift className="h-4 w-4 mr-2" />
+              Promociones
+              {stats.activeSuggestions > 0 && (
+                <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {stats.activeSuggestions}
+                </Badge>
+              )}
+            </Button>
+            {canEditProducts && (
+              <Button onClick={openAddDialog}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo Producto
+              </Button>
+            )}
+          </div>
 
       {/* Estadísticas */}
       <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
@@ -709,7 +1283,7 @@ const handleEdit = (product: FinishedProduct) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => {
+                {paginatedProducts.map((product) => {
                   // Calcular estado dinámicamente
                   const getProductStatus = () => {
                     if (product.stock_actual <= 0) return 'Agotado';
@@ -734,9 +1308,9 @@ const handleEdit = (product: FinishedProduct) => {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{product.stock_actual} {product.unidad_medida?.toLowerCase()}</div>
+                        <div className="font-medium">{formatNumber(product.stock_actual)} {product.unidad_medida?.toLowerCase()}</div>
                         <div className="text-xs text-muted-foreground">
-                          Mínimo: {product.stock_minimo}
+                          Mínimo: {formatNumber(product.stock_minimo)}
                         </div>
                       </div>
                     </TableCell>
@@ -788,8 +1362,226 @@ const handleEdit = (product: FinishedProduct) => {
               </TableBody>
             </Table>
           </div>
+          
+          {/* Paginación */}
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setItemsPerPage}
+          />
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* Tab de Mermas */}
+        <TabsContent value="mermas" className="space-y-6 mt-6">
+          {/* Estadísticas de Mermas */}
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Mermas</p>
+                    <p className="text-2xl font-bold">{mermaStats.total}</p>
+                  </div>
+                  <FileWarning className="h-5 w-5 text-gray-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Vencimiento</p>
+                    <p className="text-2xl font-bold text-orange-600">{mermaStats.porVencimiento}</p>
+                  </div>
+                  <Calendar className="h-5 w-5 text-orange-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Hongeado</p>
+                    <p className="text-2xl font-bold text-green-600">{mermaStats.porHongeado}</p>
+                  </div>
+                  <TrendingDown className="h-5 w-5 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Daño</p>
+                    <p className="text-2xl font-bold text-red-600">{mermaStats.porDano}</p>
+                  </div>
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Producción</p>
+                    <p className="text-2xl font-bold text-blue-600">{mermaStats.porProduccion}</p>
+                  </div>
+                  <ChefHat className="h-5 w-5 text-blue-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Costo Total</p>
+                    <p className="text-2xl font-bold text-red-600">S/ {mermaStats.costoTotal.toFixed(2)}</p>
+                  </div>
+                  <DollarSign className="h-5 w-5 text-red-500" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filtros de Mermas */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar mermas..."
+                    value={mermaSearchTerm}
+                    onChange={(e) => setMermaSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                
+                <Select value={selectedMermaTipo} onValueChange={setSelectedMermaTipo}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder="Tipo de Merma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los tipos</SelectItem>
+                    <SelectItem value="VENCIMIENTO">Vencimiento</SelectItem>
+                    <SelectItem value="HONGEADO">Hongeado</SelectItem>
+                    <SelectItem value="DAÑO">Daño</SelectItem>
+                    <SelectItem value="PRODUCCION">Producción</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button onClick={() => openMermaDialog()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Registrar Merma
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tabla de Mermas */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Registro de Mermas</CardTitle>
+              <CardDescription>
+                {filteredMermas.length} mermas encontradas
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>N° Registro</TableHead>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Cantidad</TableHead>
+                      <TableHead>Costo Total</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Causa</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedMermas.map((merma) => {
+                      const producto = merma.id_producto ? products.find(p => p.id_producto === merma.id_producto) : null;
+                      const insumo = merma.id_insumo ? insumos.find(i => i.id_insumo === merma.id_insumo) : null;
+                      const esInsumo = !!merma.id_insumo;
+                      
+                      return (
+                        <TableRow key={merma.id_merma}>
+                          <TableCell>
+                            <span className="font-mono text-sm">{merma.numero_registro}</span>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className={esInsumo ? "bg-purple-50 text-purple-700" : "bg-green-50 text-green-700"}>
+                                  {esInsumo ? "Insumo" : "Producto"}
+                                </Badge>
+                                <span className="font-medium">
+                                  {esInsumo ? insumo?.nombre : producto?.nombre || `#${merma.id_producto || merma.id_insumo}`}
+                                </span>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {esInsumo ? insumo?.codigo : producto?.codigo_producto}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getMermaTipoColor(merma.tipo)}>
+                              {getMermaTipoLabel(merma.tipo)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium">
+                              {merma.cantidad} {esInsumo ? insumo?.unidad_medida?.toLowerCase() : 'uds'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium text-red-600">S/ {(merma.costo_total || 0).toFixed(2)}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm">{new Date(merma.fecha_caso).toLocaleDateString()}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">{merma.causa || '-'}</span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {paginatedMermas.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          No se encontraron mermas
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              
+              {/* Paginación de Mermas */}
+              <TablePagination
+                currentPage={mermaCurrentPage}
+                totalPages={mermaTotalPages}
+                totalItems={mermaTotalItems}
+                itemsPerPage={mermaItemsPerPage}
+                onPageChange={setMermaCurrentPage}
+                onItemsPerPageChange={setMermaItemsPerPage}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Dialog para nuevo/editar producto (Mantiene camelCase en formData, lo cual es correcto) */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -961,9 +1753,9 @@ const handleEdit = (product: FinishedProduct) => {
                   onChange={(e) => setMovementData(prev => ({ ...prev, quantity: parseInt(e.target.value) }))}
                   required
                 />
-                {movementData.type === 'venta' && (
+                {movementData.type === 'venta' && selectedProduct && (
                   <p className="text-xs text-muted-foreground">
-                    Stock disponible: {selectedProduct?.stock_actual} {/* CORRECCIÓN: currentStock -> stock_actual */}
+                    Stock disponible: {formatNumber(selectedProduct.stock_actual)}
                   </p>
                 )}
               </div>
@@ -1004,7 +1796,7 @@ const handleEdit = (product: FinishedProduct) => {
 
       {/* Dialog para Sistema de Promociones */}
       <Dialog open={isPromotionDialogOpen} onOpenChange={setIsPromotionDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center">
               <Gift className="h-5 w-5 mr-2" />
@@ -1086,7 +1878,7 @@ const handleEdit = (product: FinishedProduct) => {
                           
                           <div className="flex justify-between text-sm">
                             <span>Stock actual:</span>
-                            <span className="font-medium">{product?.stock_actual} unidades</span> {/* CORRECCIÓN: product?.currentStock -> product?.stock_actual */}
+                            <span className="font-medium">{product ? formatNumber(product.stock_actual) : 0} unidades</span>
                           </div>
                           
                           {suggestion.suggestedDiscount && (
@@ -1192,6 +1984,502 @@ const handleEdit = (product: FinishedProduct) => {
               Cerrar
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para Sistema de Producción */}
+      <Dialog open={isProductionDialogOpen} onOpenChange={setIsProductionDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <ChefHat className="h-5 w-5 mr-2" />
+              Sistema de Producción
+            </DialogTitle>
+            <DialogDescription>
+              Selecciona una receta, verifica el stock y ejecuta la producción
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Paso 1: Selección de receta y cantidad */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center">
+                  <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">1</span>
+                  Seleccionar Receta y Cantidad
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="receta-produccion">Receta a producir</Label>
+                    <Select 
+                      value={selectedRecipeId?.toString() || ""} 
+                      onValueChange={handleRecipeSelection}
+                    >
+                      <SelectTrigger id="receta-produccion">
+                        <SelectValue placeholder="Selecciona una receta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {recipes.length === 0 ? (
+                          <div className="p-4 text-center text-muted-foreground">
+                            No hay recetas disponibles
+                          </div>
+                        ) : (
+                          recipes.map(recipe => (
+                            <SelectItem key={recipe.id_receta} value={recipe.id_receta.toString()}>
+                              {recipe.nombre_receta} (S/ {recipe.costo_estimado.toFixed(2)})
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cantidad-batch">¿Cuántos lotes deseas producir?</Label>
+                    <Input
+                      id="cantidad-batch"
+                      type="number"
+                      min="1"
+                      value={cantidadBatch}
+                      onChange={(e) => {
+                        setCantidadBatch(parseInt(e.target.value) || 1);
+                        setValidacionStock(null);
+                      }}
+                    />
+                    {selectedRecipeDetails && (
+                      <div className="text-sm bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
+                        <p className="text-blue-800">
+                          <strong>📦 1 lote = {selectedRecipeDetails.rendimiento_producto_terminado} {selectedRecipeDetails.rendimiento_producto_terminado === 1 ? 'unidad' : 'unidades'}</strong>
+                        </p>
+                        <p className="text-blue-600 mt-1">
+                          Con <strong>{cantidadBatch} {cantidadBatch === 1 ? 'lote' : 'lotes'}</strong> producirás → <strong className="text-blue-800 text-base">{cantidadBatch * selectedRecipeDetails.rendimiento_producto_terminado} unidades</strong>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Detalles de la receta seleccionada */}
+                {selectedRecipeDetails && (
+                  <div className="mt-4 p-4 bg-muted rounded-lg">
+                    <h4 className="font-medium mb-2 flex items-center">
+                      <Package className="h-4 w-4 mr-2" />
+                      Ingredientes necesarios
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {selectedRecipeDetails.detalles.map((detalle, index) => (
+                        <div key={index} className="flex justify-between items-center text-sm p-2 bg-background rounded border">
+                          <span>Insumo #{detalle.id_insumo}</span>
+                          <span className="font-medium">{formatNumber(detalle.cantidad)} uds</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 pt-3 border-t flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Costo estimado total:</span>
+                      <span className="font-semibold text-green-600">S/ {(selectedRecipeDetails.costo_estimado * cantidadBatch).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Paso 2: Validación de Stock */}
+            <Card className={!selectedRecipeId ? 'opacity-50' : ''}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center">
+                  <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">2</span>
+                  Validar Stock de Ingredientes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  onClick={validarStockProduccion} 
+                  disabled={!selectedRecipeId || loadingValidation}
+                  className="w-full mb-4"
+                  variant="outline"
+                >
+                  {loadingValidation ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Verificando disponibilidad...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Validar Disponibilidad de Stock
+                    </>
+                  )}
+                </Button>
+
+                {validacionStock && (
+                  <div className="space-y-4">
+                    {/* Estado general */}
+                    <div className={`p-3 rounded-lg flex items-center ${
+                      validacionStock.puede_producir 
+                        ? 'bg-green-50 border border-green-200' 
+                        : 'bg-red-50 border border-red-200'
+                    }`}>
+                      {validacionStock.puede_producir ? (
+                        <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-600 mr-2" />
+                      )}
+                      <div>
+                        <span className={`font-medium ${validacionStock.puede_producir ? 'text-green-800' : 'text-red-800'}`}>
+                          {validacionStock.puede_producir ? 'Stock Disponible' : 'Stock Insuficiente'}
+                        </span>
+                        <p className={`text-sm ${validacionStock.puede_producir ? 'text-green-600' : 'text-red-600'}`}>
+                          {validacionStock.mensaje}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tabla de insumos */}
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Insumo</TableHead>
+                          <TableHead className="text-right">Requerido</TableHead>
+                          <TableHead className="text-right">Disponible</TableHead>
+                          <TableHead className="text-center">Estado</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {validacionStock.insumos.map((insumo, index) => (
+                          <TableRow key={index}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{insumo.nombre_insumo}</div>
+                                <div className="text-xs text-muted-foreground">{insumo.codigo_insumo}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatNumber(insumo.cantidad_requerida)} {insumo.unidad_medida}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className={insumo.es_suficiente ? 'text-green-600' : 'text-red-600'}>
+                                {formatNumber(insumo.stock_disponible)} {insumo.unidad_medida}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {insumo.es_suficiente ? (
+                                <Badge className="bg-green-100 text-green-800">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  OK
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive">
+                                  <XCircle className="h-3 w-3 mr-1" />
+                                  Falta {formatNumber(insumo.cantidad_requerida - insumo.stock_disponible)}
+                                </Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Paso 3: Ejecutar Producción */}
+            <Card className={!validacionStock?.puede_producir ? 'opacity-50' : ''}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center">
+                  <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
+                  Ejecutar Producción
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-yellow-800">
+                    <AlertTriangle className="h-4 w-4 inline mr-1" />
+                    <strong>Importante:</strong> Al ejecutar la producción, se descontará automáticamente 
+                    el stock de los insumos utilizando el método FEFO (primero en vencer, primero en salir).
+                  </p>
+                </div>
+
+                {validacionStock?.puede_producir && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-green-800">
+                      <CheckCircle className="h-4 w-4 inline mr-1" />
+                      <strong>{cantidadBatch} {cantidadBatch === 1 ? 'lote' : 'lotes'}</strong> × <strong>{selectedRecipeDetails?.rendimiento_producto_terminado || 1} uds/lote</strong> = 
+                      <strong className="text-green-700 text-base ml-1">{cantidadBatch * (selectedRecipeDetails?.rendimiento_producto_terminado || 1)} unidades</strong> de 
+                      <strong>{validacionStock.nombre_receta}</strong>
+                    </p>
+                  </div>
+                )}
+
+                <Button 
+                  onClick={ejecutarProduccion}
+                  disabled={!validacionStock?.puede_producir || loadingProduction}
+                  className="w-full"
+                >
+                  {loadingProduction ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Procesando producción...
+                    </>
+                  ) : (
+                    <>
+                      <ChefHat className="h-4 w-4 mr-2" />
+                      Ejecutar Producción
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button variant="outline" onClick={closeProductionDialog}>
+              Cancelar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para Registro de Mermas */}
+      <Dialog open={isMermaDialogOpen} onOpenChange={setIsMermaDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <FileWarning className="h-5 w-5 mr-2" />
+              Registrar Merma
+            </DialogTitle>
+            <DialogDescription>
+              Registra una pérdida de insumo o producto por producción, vencimiento, daño u otra causa
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleMermaSubmit} className="space-y-4">
+            {/* Selector de tipo de item (Insumo o Producto) */}
+            <div className="space-y-2">
+              <Label>¿Qué tipo de merma registrar?</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={mermaFormData.tipoItem === 'insumo' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setMermaFormData(prev => ({
+                    ...prev,
+                    tipoItem: 'insumo',
+                    tipo: 'PRODUCCION',
+                    id_producto: null,
+                    id_insumo: null,
+                    costo_unitario: 0,
+                    cantidad: 0,
+                    costo_total: 0
+                  }))}
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Insumo (Materia Prima)
+                </Button>
+                <Button
+                  type="button"
+                  variant={mermaFormData.tipoItem === 'producto' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setMermaFormData(prev => ({
+                    ...prev,
+                    tipoItem: 'producto',
+                    tipo: 'VENCIMIENTO',
+                    id_producto: null,
+                    id_insumo: null,
+                    costo_unitario: 0,
+                    cantidad: 0,
+                    costo_total: 0
+                  }))}
+                >
+                  <ChefHat className="h-4 w-4 mr-2" />
+                  Producto Terminado
+                </Button>
+              </div>
+            </div>
+
+            {/* Selector de Insumo o Producto según el tipo */}
+            {mermaFormData.tipoItem === 'insumo' ? (
+              <div className="space-y-2">
+                <Label htmlFor="merma-insumo">Insumo</Label>
+                <Select 
+                  value={mermaFormData.id_insumo?.toString() || ""} 
+                  onValueChange={(value: string) => {
+                    const insumo = insumos.find(i => i.id_insumo === parseInt(value));
+                    setMermaFormData(prev => ({
+                      ...prev,
+                      id_insumo: parseInt(value),
+                      id_producto: null,
+                      costo_unitario: insumo?.precio_promedio || 0
+                    }));
+                  }}
+                >
+                  <SelectTrigger id="merma-insumo">
+                    <SelectValue placeholder="Selecciona un insumo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {insumos.filter(i => i.stock_actual > 0).map(insumo => (
+                      <SelectItem key={insumo.id_insumo} value={insumo.id_insumo.toString()}>
+                        {insumo.nombre} (Stock: {insumo.stock_actual} {insumo.unidad_medida})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="merma-producto">Producto</Label>
+                <Select 
+                  value={mermaFormData.id_producto?.toString() || ""} 
+                  onValueChange={(value: string) => {
+                    const producto = products.find(p => p.id_producto === parseInt(value));
+                    setMermaFormData(prev => ({
+                      ...prev,
+                      id_producto: parseInt(value),
+                      id_insumo: null,
+                      costo_unitario: producto?.precio_venta || 0
+                    }));
+                  }}
+                >
+                  <SelectTrigger id="merma-producto">
+                    <SelectValue placeholder="Selecciona un producto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.filter(p => p.stock_actual > 0).map(producto => (
+                      <SelectItem key={producto.id_producto} value={producto.id_producto.toString()}>
+                        {producto.nombre} (Stock: {producto.stock_actual})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="merma-tipo">Tipo de Merma</Label>
+                <Select 
+                  value={mermaFormData.tipo} 
+                  onValueChange={(value: string) => setMermaFormData(prev => ({ ...prev, tipo: value }))}
+                >
+                  <SelectTrigger id="merma-tipo">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PRODUCCION">Producción (uso extra)</SelectItem>
+                    <SelectItem value="VENCIMIENTO">Vencimiento</SelectItem>
+                    <SelectItem value="HONGEADO">Hongeado</SelectItem>
+                    <SelectItem value="DAÑO">Daño</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="merma-cantidad">Cantidad</Label>
+                <Input
+                  id="merma-cantidad"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  max={
+                    mermaFormData.tipoItem === 'insumo' 
+                      ? insumos.find(i => i.id_insumo === mermaFormData.id_insumo)?.stock_actual || 999
+                      : products.find(p => p.id_producto === mermaFormData.id_producto)?.stock_actual || 999
+                  }
+                  value={mermaFormData.cantidad || ""}
+                  onChange={(e) => {
+                    const cantidad = parseFloat(e.target.value) || 0;
+                    setMermaFormData(prev => ({
+                      ...prev,
+                      cantidad,
+                      costo_total: cantidad * (prev.costo_unitario || 0)
+                    }));
+                  }}
+                  required
+                />
+                {mermaFormData.tipoItem === 'insumo' && mermaFormData.id_insumo && (
+                  <p className="text-xs text-muted-foreground">
+                    Unidad: {insumos.find(i => i.id_insumo === mermaFormData.id_insumo)?.unidad_medida}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="merma-costo-unitario">Costo Unitario (S/)</Label>
+                <Input
+                  id="merma-costo-unitario"
+                  type="number"
+                  step="0.01"
+                  value={mermaFormData.costo_unitario || ""}
+                  onChange={(e) => {
+                    const costo = parseFloat(e.target.value) || 0;
+                    setMermaFormData(prev => ({
+                      ...prev,
+                      costo_unitario: costo,
+                      costo_total: (prev.cantidad || 0) * costo
+                    }));
+                  }}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="merma-costo-total">Costo Total (S/)</Label>
+                <Input
+                  id="merma-costo-total"
+                  type="number"
+                  step="0.01"
+                  value={mermaFormData.costo_total?.toFixed(2) || "0.00"}
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="merma-fecha">Fecha del Caso</Label>
+              <Input
+                id="merma-fecha"
+                type="date"
+                value={mermaFormData.fecha_caso}
+                onChange={(e) => setMermaFormData(prev => ({ ...prev, fecha_caso: e.target.value }))}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="merma-causa">Causa</Label>
+              <Input
+                id="merma-causa"
+                placeholder={mermaFormData.tipoItem === 'insumo' ? "Ej: Se usó más harina de lo normal al amasar..." : "Describe brevemente la causa..."}
+                value={mermaFormData.causa}
+                onChange={(e) => setMermaFormData(prev => ({ ...prev, causa: e.target.value }))}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="merma-observacion">Observaciones (opcional)</Label>
+              <Textarea
+                id="merma-observacion"
+                placeholder="Observaciones adicionales..."
+                value={mermaFormData.observacion}
+                onChange={(e) => setMermaFormData(prev => ({ ...prev, observacion: e.target.value }))}
+              />
+            </div>
+            
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsMermaDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="destructive">
+                <FileWarning className="h-4 w-4 mr-2" />
+                Registrar Merma
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
