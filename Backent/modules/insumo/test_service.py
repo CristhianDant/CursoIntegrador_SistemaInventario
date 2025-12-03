@@ -90,8 +90,12 @@ class TestInsumoService:
         - Retorna una lista de schemas Insumo
         """
         # Arrange
-        with patch.object(self.service.repository, 'get_insumos') as mock_get:
+        with patch.object(self.service.repository, 'get_insumos') as mock_get, \
+             patch.object(self.service.repository, 'get_stock_actual_por_insumo') as mock_stock, \
+             patch.object(self.service.repository, 'get_precio_promedio_por_insumo') as mock_precio:
             mock_get.return_value = [mock_insumo_model]
+            mock_stock.return_value = {1: Decimal('100.00')}
+            mock_precio.return_value = {1: Decimal('10.50')}
 
             # Act
             resultado = self.service.get_insumos()
@@ -109,8 +113,12 @@ class TestInsumoService:
         - Usa los parámetros skip y limit correctamente
         """
         # Arrange
-        with patch.object(self.service.repository, 'get_insumos') as mock_get:
+        with patch.object(self.service.repository, 'get_insumos') as mock_get, \
+             patch.object(self.service.repository, 'get_stock_actual_por_insumo') as mock_stock, \
+             patch.object(self.service.repository, 'get_precio_promedio_por_insumo') as mock_precio:
             mock_get.return_value = [mock_insumo_model]
+            mock_stock.return_value = {1: Decimal('100.00')}
+            mock_precio.return_value = {1: Decimal('10.50')}
 
             # Act
             resultado = self.service.get_insumos(skip=10, limit=50)
@@ -126,8 +134,12 @@ class TestInsumoService:
         - Retorna una lista vacía
         """
         # Arrange
-        with patch.object(self.service.repository, 'get_insumos') as mock_get:
+        with patch.object(self.service.repository, 'get_insumos') as mock_get, \
+             patch.object(self.service.repository, 'get_stock_actual_por_insumo') as mock_stock, \
+             patch.object(self.service.repository, 'get_precio_promedio_por_insumo') as mock_precio:
             mock_get.return_value = []
+            mock_stock.return_value = {}
+            mock_precio.return_value = {}
 
             # Act
             resultado = self.service.get_insumos()
@@ -145,8 +157,12 @@ class TestInsumoService:
         - Retorna el schema Insumo
         """
         # Arrange
-        with patch.object(self.service.repository, 'get_insumo') as mock_get:
+        with patch.object(self.service.repository, 'get_insumo') as mock_get, \
+             patch.object(self.service.repository, 'get_stock_actual_por_insumo') as mock_stock, \
+             patch.object(self.service.repository, 'get_precio_promedio_por_insumo') as mock_precio:
             mock_get.return_value = mock_insumo_model
+            mock_stock.return_value = {1: Decimal('100.00')}
+            mock_precio.return_value = {1: Decimal('10.50')}
 
             # Act
             resultado = self.service.get_insumo(insumo_id=1)
