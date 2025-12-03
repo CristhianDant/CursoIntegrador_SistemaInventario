@@ -19,7 +19,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 config = context.config
 
 
-database_url = f"postgresql://{settings.POST_USER}:{settings.POST_PASS}@localhost:{settings.POST_PORT}/{settings.POST_DB}"
+database_url = f"postgresql://{settings.POST_USER}:{settings.POST_PASS}@{settings.HOST_DB}:{settings.POST_PORT}/{settings.POST_DB}"
 config.set_main_option("sqlalchemy.url", database_url)
 
 # Interpret the config file for Python logging.
