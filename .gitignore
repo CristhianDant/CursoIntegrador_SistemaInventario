@@ -257,3 +257,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# ==================== Docker ====================
+# No ignorar Dockerfiles ni docker-compose.yml
+# Pero sí ignorar datos persistentes
+postgres_data/
+prometheus_data/
+grafana_data/
+
+# Logs y backups generados en runtime
+Backent/logs/
+Backent/backups/
+logs/
+backups/
+

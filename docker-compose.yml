@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # ==================== PostgreSQL Database ====================
+  postgres:
+    image: postgres:15-alpine
+    container_name: inventario_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POST_USER}
+      POSTGRES_PASSWORD: ${POST_PASS}
+      POSTGRES_DB: ${POST_DB}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./Backent/backups:/backups
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POST_USER} -d ${POST_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - inventario_network
+
+  # ==================== Backend FastAPI ====================
+  backend:
+    build:
+      context: ./Backent
+      dockerfile: Dockerfile
+    container_name: inventario_backend
+    restart: unless-stopped
+    env_file:
+      - ./Backent/.env
+    environment:
+      HOST_DB: postgres
+      POST_DB: ${POST_DB}
+    volumes:
+      - ./Backent/logs:/app/logs
+      - ./Backent/backups:/app/backups
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - inventario_network
+
+  # ==================== Frontend Vite/React ====================
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api}
+    container_name: inventario_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - inventario_network
+
+  # ==================== Prometheus (Métricas) ====================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: inventario_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+    networks:
+      - inventario_network
+
+volumes:
+  postgres_data:
+    driver: local
+  prometheus_data:
+    driver: local
+
+networks:
+  inventario_network:
+    driver: bridge

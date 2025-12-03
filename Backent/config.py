@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
     DEBUG: bool = True
     APP_VERSION: str = "1.0.0"
+    
+    # Frontend URL para CORS en producción
+    FRONTEND_URL: str = "http://localhost"
 
     class Config:
         env_file = ".env"

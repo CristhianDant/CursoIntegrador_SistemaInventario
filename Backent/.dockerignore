@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs y backups (se crean en runtime)
+logs/
+backups/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+
+# Documentación
+docs/
+UML/
+README.md
+
+# Bases de datos locales
+*.db
+*.sqlite
+*.sqlite3
+
+# Alembic (migraciones se ejecutan en runtime)
+alembic/versions/*.py
+
+# Scripts de desarrollo
+test_*.py
+debug_*.py
+check_*.py
+fix_*.py
+load_*.py
+quick_*.py
+ejecutar_*.py
