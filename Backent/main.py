@@ -32,6 +32,7 @@ from modules.promociones import promocion_router
 from modules.reportes import router as reportes_router
 from modules.alertas import router as alertas_router
 from modules.health import router as health_router
+from modules.backup import router as backup_router
 from database import SessionLocal
 
 # Configurar el logging antes de crear la aplicación
@@ -173,6 +174,9 @@ app.include_router(ventas_router.router, prefix="/api/v1/ventas", tags=["Ventas"
 app.include_router(reportes_router.router, prefix="/api/v1/reportes", tags=["Reportes"])
 app.include_router(alertas_router.router, prefix="/api/v1/alertas", tags=["Alertas"])
 app.include_router(promocion_router, prefix="/api/v1/promociones", tags=["Promociones"])
+
+# Router de Backup y Mantenimiento
+app.include_router(backup_router.router, prefix="/api/v1/backup", tags=["Backup y Mantenimiento"])
 
 # Router de Health Checks (sin prefijo para acceso directo)
 app.include_router(health_router, tags=["Monitoreo"])

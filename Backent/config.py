@@ -42,6 +42,20 @@ class Settings(BaseSettings):
     HEALTH_CHECK_ALERT_ENABLED: bool = True
     HEALTH_CHECK_INTERVAL_SECONDS: int = 60
 
+    # ==================== BACKUP ====================
+    BACKUP_ENABLED: bool = True
+    BACKUP_PATH: str = "backups"  # Directorio para almacenar backups
+    BACKUP_RETENTION_DAYS: int = 90  # Días de retención (3 meses)
+    BACKUP_FULL_DAY: int = 0  # Día de la semana para backup completo (0=Lunes)
+    BACKUP_HOUR: int = 3  # Hora para ejecutar backups (3 AM)
+    BACKUP_MINUTE: int = 0
+
+    # ==================== LOGS MAINTENANCE ====================
+    LOGS_COMPRESSION_ENABLED: bool = True
+    LOGS_COMPRESSION_DAYS: int = 7  # Comprimir logs más antiguos que X días
+    LOGS_RETENTION_DAYS: int = 90  # Eliminar logs comprimidos mayores a X días
+    LOGS_PATH: str = "logs"  # Directorio de logs
+
     # ==================== ENVIRONMENT ====================
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
     DEBUG: bool = True

@@ -1,0 +1,6 @@
+# Directorio para almacenar backups de base de datos
+# Este directorio se crea automáticamente y contiene:
+# - Backups completos semanales (FULL)
+# - Backups diferenciales diarios (DIFF)
+# Los backups se comprimen con gzip (.sql.gz)
+# Retención: 90 días (configurable)
