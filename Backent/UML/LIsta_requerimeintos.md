@@ -1,7 +1,7 @@
 # 📋 Requisitos Pendientes del Sistema de Inventario
 
-> **Fecha de evaluación:** 2 de diciembre de 2025  
-> **Completitud actual:** ~65%  
+> **Fecha de evaluación:** 3 de diciembre de 2025  
+> **Completitud actual:** ~75%  
 > **Basado en:** Estándares de tesis (Kumar et al., 2021; Najlae et al., 2021; Meza Hernández, 2024)
 
 ---
@@ -13,11 +13,11 @@
 | Funciones Core (12) | 10 | 2 | 83% |
 | Indicadores KPI (5) | 5 | 0 | 100% |
 | Módulos Pantalla (4) | 4 | 0 | 100% |
-| Pruebas de Software y Seguridad | 0 | 5 | 0% |
+| Pruebas de Software y Seguridad | 4 | 1 | 80% |
 | Despliegue del Proyecto | 0 | 4 | 0% |
-| Monitoreo del Proyecto | 0 | 4 | 0% |
+| Monitoreo del Proyecto | 4 | 0 | 100% |
 | Mantenimiento del Proyecto | 0 | 4 | 0% |
-| **TOTAL** | - | - | **~65%** |
+| **TOTAL** | - | - | **~80%** |
 
 ---
 
@@ -63,11 +63,11 @@
 
 | ID | Requisito | Prioridad | Estado | Descripción |
 |----|-----------|-----------|--------|-------------|
-| TEST-01 | Tests unitarios | 🔴 Alta | No existe | Tests para services y repositories con pytest |
-| TEST-02 | Tests de integración | 🔴 Alta | No existe | Tests de endpoints API con TestClient |
-| TEST-03 | Tests de seguridad | 🔴 Alta | No existe | Pruebas de autenticación, autorización, SQL injection, XSS |
-| TEST-04 | Reporte de cobertura | 🟡 Media | No existe | Cobertura mínima 70% con pytest-cov |
-| TEST-05 | Reporte de pruebas de seguridad | 🔴 Alta | No existe | Documento con vulnerabilidades encontradas y mitigaciones |
+| TEST-01 | Tests unitarios | 🔴 Alta | ✅ Implementado | 282 tests para services con pytest (insumo, alertas, reportes, usuarios, proveedores, productos, recetas, promociones, mermas, orden_compra, roles, permisos) |
+| TEST-02 | Tests de integración | 🔴 Alta | ✅ Implementado | Tests de endpoints API con TestClient (login, productos, proveedores, ventas, security) |
+| TEST-03 | Tests de seguridad | 🔴 Alta | ✅ Implementado | Pruebas de autenticación JWT, autorización por roles, validación de tokens |
+| TEST-04 | Reporte de cobertura | 🟡 Media | ✅ Implementado | Cobertura actual: 74.94% (supera el mínimo de 70%) con pytest-cov |
+| TEST-05 | Reporte de pruebas de seguridad | 🔴 Alta | 🟡 Parcial | Tests de seguridad implementados, falta documento formal de vulnerabilidades |
 
 ### 🚀 DESPLIEGUE DEL PROYECTO (Rúbrica: 80%)
 
@@ -82,17 +82,17 @@
 
 | ID | Requisito | Prioridad | Estado | Descripción |
 |----|-----------|-----------|--------|-------------|
-| MON-01 | Sistema de logs estructurados | 🔴 Alta | Parcial | Logs con formato JSON, niveles y rotación |
-| MON-02 | Métricas de rendimiento | 🟡 Media | No existe | Tiempos de respuesta, uso de recursos |
-| MON-03 | Health checks | 🔴 Alta | No existe | Endpoints /health y /ready para verificar estado |
-| MON-04 | Plan de monitoreo | 🟡 Media | No existe | Documento con estrategia de monitoreo y alertas |
+| MON-01 | Sistema de logs estructurados | 🔴 Alta | ✅ Implementado | Logs con formato JSON/Text, niveles, rotación con Loguru. Archivos: `app.log`, `error.log`, `sesiones.log`, `health.log`. Request ID para trazabilidad. |
+| MON-02 | Métricas de rendimiento | 🟡 Media | ✅ Implementado | `prometheus-fastapi-instrumentator 7.1.0` - Endpoint `/metrics` con latencia, requests/s, tamaño de responses |
+| MON-03 | Health checks | 🔴 Alta | ✅ Implementado | Endpoints `/health` (liveness), `/ready` (readiness), `/status` (detallado). Verifica BD, Scheduler, SMTP |
+| MON-04 | Plan de monitoreo | 🟡 Media | ✅ Implementado | Documento `docs/plan_monitoreo.md` con estrategia de alertas, umbrales y procedimientos de respuesta |
 
 ### 🔧 MANTENIMIENTO DEL PROYECTO (Rúbrica: 100%)
 
 | ID | Requisito | Prioridad | Estado | Descripción |
 |----|-----------|-----------|--------|-------------|
 | MAN-01 | Scripts de backup | 🔴 Alta | No existe | Backup automático de base de datos |
-| MAN-02 | Cron jobs | 🟡 Media | No existe | Tareas programadas (limpieza, reportes, alertas) |
+| MAN-02 | Cron jobs | 🟡 Media | ✅ Implementado | APScheduler configurado con jobs diarios de alertas. Lifecycle integrado en FastAPI |
 | MAN-03 | Scripts de mantenimiento | 🟡 Media | No existe | Limpieza de logs, optimización de BD |
 | MAN-04 | Plan de mantenimiento | 🔴 Alta | No existe | Documento con procedimientos de mantenimiento |
 
@@ -1132,10 +1132,10 @@ class KPIValue(BaseModel):
 
 | Criterio Rúbrica | % Requerido | Estado Actual | IDs Relacionados |
 |------------------|-------------|---------------|------------------|
-| Pruebas de Software y Seguridad | 60-70% | 0% | TEST-01 a TEST-05 |
+| Pruebas de Software y Seguridad | 60-70% | 80% ✅ | TEST-01 a TEST-05 |
 | Despliegue del Proyecto | 80% | 0% | DEP-01 a DEP-04 |
-| Monitoreo del Proyecto | 90% | 10% | MON-01 a MON-04 |
-| Mantenimiento del Proyecto | 100% | 0% | MAN-01 a MAN-04 |
+| Monitoreo del Proyecto | 90% | 100% ✅ | MON-01 a MON-04 |
+| Mantenimiento del Proyecto | 100% | 25% | MAN-01 a MAN-04 |
 | Construcción del Producto Final | 100% | 50% | PRD-01 a PRD-04 |
 
 ---

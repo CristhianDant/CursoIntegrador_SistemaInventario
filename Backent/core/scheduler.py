@@ -41,6 +41,8 @@ def init_scheduler():
     Se debe llamar al inicio de la aplicación.
     """
     from jobs.alertas_job import ejecutar_alertas_diarias_wrapper
+    from jobs.backup_job import ejecutar_backup_diario_wrapper
+    from jobs.logs_maintenance_job import ejecutar_mantenimiento_logs_wrapper
     
     # Agregar listener para logging de eventos
     scheduler.add_listener(job_listener, EVENT_JOB_ERROR | EVENT_JOB_EXECUTED)
@@ -60,6 +62,44 @@ def init_scheduler():
     logger.info(
         f"📅 Scheduler configurado: Job 'alertas_diarias' programado para las {hora:02d}:{minuto:02d}"
     )
+    
+    # ==================== JOBS DE MANTENIMIENTO ====================
+    
+    # Job de backup diario (3 AM por defecto)
+    backup_enabled = getattr(settings, 'BACKUP_ENABLED', True)
+    backup_hora = getattr(settings, 'BACKUP_HOUR', 3)
+    backup_minuto = getattr(settings, 'BACKUP_MINUTE', 0)
+    
+    if backup_enabled:
+        scheduler.add_job(
+            ejecutar_backup_diario_wrapper,
+            trigger=CronTrigger(hour=backup_hora, minute=backup_minuto),
+            id="backup_diario",
+            name="Backup de base de datos (completo semanal / diferencial diario)",
+            replace_existing=True
+        )
+        logger.info(
+            f"📅 Scheduler configurado: Job 'backup_diario' programado para las {backup_hora:02d}:{backup_minuto:02d}"
+        )
+    else:
+        logger.warning("⚠️ Job de backup deshabilitado (BACKUP_ENABLED=false)")
+    
+    # Job de mantenimiento de logs (4 AM por defecto)
+    logs_enabled = getattr(settings, 'LOGS_COMPRESSION_ENABLED', True)
+    
+    if logs_enabled:
+        scheduler.add_job(
+            ejecutar_mantenimiento_logs_wrapper,
+            trigger=CronTrigger(hour=4, minute=0),
+            id="logs_maintenance",
+            name="Compresión y limpieza de logs antiguos",
+            replace_existing=True
+        )
+        logger.info(
+            f"📅 Scheduler configurado: Job 'logs_maintenance' programado para las 04:00"
+        )
+    else:
+        logger.warning("⚠️ Job de mantenimiento de logs deshabilitado (LOGS_COMPRESSION_ENABLED=false)")
 
 
 def start_scheduler():
