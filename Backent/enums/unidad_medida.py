@@ -1,10 +1,10 @@
 import enum
 
 class UnidadMedidaEnum(str, enum.Enum):
-    KILOGRAMO = "KG"
-    GRAMO = "G"
-    LITRO = "L"
-    MILILITRO = "ML"
+    KG = "KG"
+    G = "G"
+    L = "L"
+    ML = "ML"
     UNIDAD = "UNIDAD"
     CAJA = "CAJA"
     PAQUETE = "PAQUETE"
