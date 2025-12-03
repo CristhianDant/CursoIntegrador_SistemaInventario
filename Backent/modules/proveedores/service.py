@@ -2,8 +2,10 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from .repository import ProveedorRepository
 from .schemas import ProveedorCreate, ProveedorUpdate
+from .service_interface import ProveedorServiceInterface
 
-class ProveedorService:
+
+class ProveedorService(ProveedorServiceInterface):
     def __init__(self, db: Session):
         self.repository = ProveedorRepository(db)
 

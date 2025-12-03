@@ -18,9 +18,10 @@ from .schemas import (
     SemaforoEstadoEnum
 )
 from modules.empresa.model import Empresa, DEFAULT_CONFIGURACION_ALERTAS
+from .service_interface import AlertasServiceInterface
 
 
-class AlertasService:
+class AlertasService(AlertasServiceInterface):
     """Servicio para la lógica de negocio del módulo de alertas."""
     
     def __init__(self, db: Session):

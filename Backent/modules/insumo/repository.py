@@ -3,8 +3,10 @@ from sqlalchemy import func, desc
 from modules.insumo.model import Insumo
 from modules.insumo.schemas import InsumoCreate, InsumoUpdate
 from modules.gestion_almacen_inusmos.ingresos_insumos.model import IngresoProducto, IngresoProductoDetalle
+from .repository_interface import InsumoRepositoryInterface
 
-class InsumoRepository:
+
+class InsumoRepository(InsumoRepositoryInterface):
     def __init__(self, db: Session):
         self.db = db
 

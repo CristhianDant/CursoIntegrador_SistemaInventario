@@ -6,9 +6,10 @@ import datetime
 from modules.gestion_almacen_inusmos.movimiento_insumos.model import MovimientoInsumo
 from modules.gestion_almacen_inusmos.produccion.model import Produccion
 from enums.tipo_movimiento import TipoMovimientoEnum
+from .repository_interface import ProduccionRepositoryInterface
 
 
-class ProduccionRepository:
+class ProduccionRepository(ProduccionRepositoryInterface):
     """
     Repository para operaciones de producción.
     Usa raw SQL para facilitar modificaciones futuras.

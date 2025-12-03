@@ -1,8 +1,10 @@
 from sqlalchemy.orm import Session
 from .model import Proveedor
 from .schemas import ProveedorCreate, ProveedorUpdate
+from .repository_interface import ProveedorRepositoryInterface
 
-class ProveedorRepository:
+
+class ProveedorRepository(ProveedorRepositoryInterface):
     def __init__(self, db: Session):
         self.db = db
 

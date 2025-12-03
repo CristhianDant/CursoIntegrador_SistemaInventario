@@ -4,8 +4,10 @@ from sqlalchemy.orm import Session
 from modules.empresa.repository import EmpresaRepository
 from modules.empresa.schemas import EmpresaCreate, EmpresaUpdate
 from fastapi import HTTPException, status
+from .service_interface import EmpresaServiceInterface
 
-class EmpresaService:
+
+class EmpresaService(EmpresaServiceInterface):
     def __init__(self, db: Session):
         self.repository = EmpresaRepository(db)
 

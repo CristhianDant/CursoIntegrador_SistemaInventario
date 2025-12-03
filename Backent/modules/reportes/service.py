@@ -19,9 +19,10 @@ from .schemas import (
 )
 # Reutilizar lógica de alertas
 from modules.alertas.service import AlertasService
+from .service_interface import ReportesServiceInterface
 
 
-class ReportesService:
+class ReportesService(ReportesServiceInterface):
     """Servicio de lógica de negocio para reportes."""
     
     def __init__(self, db: Session):

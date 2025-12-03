@@ -1,8 +1,10 @@
 from sqlalchemy.orm import Session
 from modules.insumo.repository import InsumoRepository
 from modules.insumo.schemas import Insumo, InsumoCreate, InsumoUpdate
+from .service_interface import InsumoServiceInterface
 
-class InsumoService:
+
+class InsumoService(InsumoServiceInterface):
     def __init__(self, db: Session):
         self.repository = InsumoRepository(db)
 

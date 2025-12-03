@@ -8,9 +8,10 @@ from sqlalchemy import func, case, and_, or_, desc, text
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import List, Optional, Dict, Any
+from .repository_interface import ReportesRepositoryInterface
 
 
-class ReportesRepository:
+class ReportesRepository(ReportesRepositoryInterface):
     """Repository con consultas SQL para reportes."""
     
     def __init__(self, db: Session):

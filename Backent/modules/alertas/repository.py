@@ -5,9 +5,10 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from .model import Notificacion, TipoAlerta, SemaforoEstado
+from .repository_interface import AlertasRepositoryInterface
 
 
-class AlertasRepository:
+class AlertasRepository(AlertasRepositoryInterface):
     """Repositorio para operaciones de base de datos del módulo de alertas."""
     
     def __init__(self, db: Session):

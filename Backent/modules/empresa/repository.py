@@ -3,8 +3,10 @@
 from sqlalchemy.orm import Session
 from modules.empresa.model import Empresa
 from modules.empresa.schemas import EmpresaCreate, EmpresaUpdate
+from .repository_interface import EmpresaRepositoryInterface
 
-class EmpresaRepository:
+
+class EmpresaRepository(EmpresaRepositoryInterface):
     def __init__(self, db: Session):
         self.db = db
 

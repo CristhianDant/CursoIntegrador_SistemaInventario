@@ -3,8 +3,10 @@ from sqlalchemy import and_, or_
 from typing import List, Optional
 from datetime import date
 from .model import Promocion, PromocionCombo, EstadoPromocion, TipoPromocion
+from .repository_interface import PromocionRepositoryInterface
 
-class PromocionRepository:
+
+class PromocionRepository(PromocionRepositoryInterface):
     def __init__(self, db: Session):
         self.db = db
 

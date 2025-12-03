@@ -17,9 +17,10 @@ from modules.gestion_almacen_inusmos.produccion.schemas import (
     MovimientoProductoTerminado,
     InsumoConsumidoTrazabilidad
 )
+from .service_interface import ProduccionServiceInterface
 
 
-class ProduccionService:
+class ProduccionService(ProduccionServiceInterface):
     """
     Service para operaciones de producción.
     Maneja la lógica de negocio para validar stock y ejecutar producción.

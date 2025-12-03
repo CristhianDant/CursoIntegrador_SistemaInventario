@@ -1,23 +1,23 @@
 # 📋 Requisitos Pendientes del Sistema de Inventario
 
-> **Fecha de evaluación:** 28 de noviembre de 2025  
-> **Completitud actual:** ~35%  
+> **Fecha de evaluación:** 2 de diciembre de 2025  
+> **Completitud actual:** ~65%  
 > **Basado en:** Estándares de tesis (Kumar et al., 2021; Najlae et al., 2021; Meza Hernández, 2024)
 
 ---
-aaaaaaaa
+
 ## 📊 Resumen de Estado
 
 | Categoría | Implementado | Pendiente | % Completitud |
 |-----------|--------------|-----------|---------------|
-| Funciones Core (8) | 2 | 6 | 25% |
-| Indicadores KPI (5) | 0.5 | 4.5 | 10% |
-| Módulos Pantalla (4) | 1 | 3 | 25% |
+| Funciones Core (12) | 10 | 2 | 83% |
+| Indicadores KPI (5) | 5 | 0 | 100% |
+| Módulos Pantalla (4) | 4 | 0 | 100% |
 | Pruebas de Software y Seguridad | 0 | 5 | 0% |
 | Despliegue del Proyecto | 0 | 4 | 0% |
 | Monitoreo del Proyecto | 0 | 4 | 0% |
 | Mantenimiento del Proyecto | 0 | 4 | 0% |
-| **TOTAL** | - | - | **~25%** |
+| **TOTAL** | - | - | **~65%** |
 
 ---
 
@@ -27,37 +27,37 @@ aaaaaaaa
 
 | ID | Requisito | Prioridad | Estado | Módulo Afectado |
 |----|-----------|-----------|--------|-----------------|
-| FC-01 | Salidas por producción (descuento automático FEFO) | 🔴 Alta | Parcial | `produccion/` |
-| FC-02 | Ventas con descuento automático de stock | 🔴 Alta | No existe | `ventas/` |
-| FC-03 | Semáforo de vencimientos (Verde/Amarillo/Rojo) | 🔴 Alta | No existe | `alertas/` |
-| FC-04 | Lista diaria "Usar hoy" | 🟡 Media | No existe | `alertas/` |
-| FC-05 | Alertas automáticas de stock crítico | 🔴 Alta | No existe | `alertas/` |
-| FC-06 | Alertas de vencimiento próximo | 🔴 Alta | No existe | `alertas/` |
-| FC-07 | Análisis ABC de productos | 🟡 Media | No existe | `reportes/` |
-| FC-08 | Punto de Venta integrado | 🔴 Alta | No existe | `ventas/` |
-| FC-09 | Descuento automático productos día anterior | 🟡 Media | No existe | `ventas/` |
-| FC-10 | Lista de compras automática | 🟡 Media | No existe | `compras/` |
+| FC-01 | Salidas por producción (descuento automático FEFO) | 🔴 Alta | ✅ Implementado | `gestion_almacen_inusmos/produccion/` |
+| FC-02 | Ventas con descuento automático de stock | 🔴 Alta | ✅ Implementado | `gestion_almacen_productos/ventas/` |
+| FC-03 | Semáforo de vencimientos (Verde/Amarillo/Rojo) | 🔴 Alta | ✅ Implementado | `alertas/` |
+| FC-04 | Lista diaria "Usar hoy" | 🟡 Media | ✅ Implementado | `alertas/` |
+| FC-05 | Alertas automáticas de stock crítico | 🔴 Alta | ✅ Implementado | `alertas/` |
+| FC-06 | Alertas de vencimiento próximo | 🔴 Alta | ✅ Implementado | `alertas/` |
+| FC-07 | Análisis ABC de productos | 🟡 Media | ✅ Implementado | `reportes/` |
+| FC-08 | Punto de Venta integrado | 🔴 Alta | ✅ Implementado | `gestion_almacen_productos/ventas/` |
+| FC-09 | Descuento automático productos día anterior | 🟡 Media | ✅ Implementado | `gestion_almacen_productos/ventas/` |
+| FC-10 | Lista de compras automática | 🟡 Media | ✅ Implementado | `orden_de_compra/` |
 | FC-11 | Costeo automático de recetas | 🟡 Media | Parcial | `recetas/` |
-| FC-12 | Reporte diario automático | 🟡 Media | No existe | `reportes/` |
+| FC-12 | Reporte diario automático | 🟡 Media | ✅ Implementado | `reportes/` |
 
 ### 📊 INDICADORES KPI
 
 | ID | Requisito | Prioridad | Estado | Módulo Afectado |
 |----|-----------|-----------|--------|-----------------|
-| KPI-01 | Cálculo % merma diaria | 🔴 Alta | No existe | `dashboard/` |
-| KPI-02 | Contador productos vencidos hoy | 🔴 Alta | No existe | `dashboard/` |
-| KPI-03 | Métrica cumplimiento FEFO | 🟡 Media | No existe | `dashboard/` |
-| KPI-04 | Contador stock crítico | 🔴 Alta | No existe | `dashboard/` |
-| KPI-05 | Cálculo rotación inventario | 🟢 Baja | No existe | `dashboard/` |
+| KPI-01 | Cálculo % merma diaria | 🔴 Alta | ✅ Implementado | `reportes/` |
+| KPI-02 | Contador productos vencidos hoy | 🔴 Alta | ✅ Implementado | `reportes/` |
+| KPI-03 | Métrica cumplimiento FEFO | 🟡 Media | ✅ Implementado | `reportes/` |
+| KPI-04 | Contador stock crítico | 🔴 Alta | ✅ Implementado | `reportes/` |
+| KPI-05 | Cálculo rotación inventario | 🟢 Baja | ✅ Implementado | `reportes/` |
 
 ### 🖥️ PANTALLAS/MÓDULOS
 
 | ID | Requisito | Prioridad | Estado | Módulo Afectado |
 |----|-----------|-----------|--------|-----------------|
-| PM-01 | Dashboard con KPIs | 🔴 Alta | No existe | `dashboard/` |
-| PM-02 | Pantalla de Producción sugerida | 🟡 Media | Parcial | `produccion/` |
-| PM-03 | Punto de Venta (POS) | 🔴 Alta | No existe | `ventas/` |
-| PM-04 | Inventario con semáforo visual | 🟡 Media | Parcial | `alertas/` |
+| PM-01 | Dashboard con KPIs | 🔴 Alta | ✅ Implementado | `reportes/` |
+| PM-02 | Pantalla de Producción sugerida | 🟡 Media | ✅ Implementado | `gestion_almacen_inusmos/produccion/` |
+| PM-03 | Punto de Venta (POS) | 🔴 Alta | ✅ Implementado | `gestion_almacen_productos/ventas/` |
+| PM-04 | Inventario con semáforo visual | 🟡 Media | ✅ Implementado | `alertas/` |
 
 ### 🧪 PRUEBAS DE SOFTWARE Y SEGURIDAD (Rúbrica: 60-70%)
 

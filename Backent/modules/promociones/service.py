@@ -9,8 +9,10 @@ from .schemas import (
 )
 from modules.productos_terminados.model import ProductoTerminado
 from modules.gestion_almacen_productos.movimiento_productos_terminados.model import MovimientoProductoTerminado
+from .service_interface import PromocionServiceInterface
 
-class PromocionService:
+
+class PromocionService(PromocionServiceInterface):
     def __init__(self, db: Session):
         self.db = db
         self.repository = PromocionRepository(db)
