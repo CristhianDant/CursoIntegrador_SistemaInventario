@@ -70,10 +70,10 @@ class ProduccionService(ProduccionServiceInterface):
             if insumo["es_opcional"]:
                 continue
             
-            # Calcular cantidad requerida: cantidad_por_unidad × lotes × rendimiento
-            # cantidad_por_rendimiento es la cantidad necesaria para 1 unidad del producto
+            # Calcular cantidad requerida: cantidad_por_rendimiento × cantidad_batch
+            # cantidad_por_rendimiento es la cantidad necesaria por batch de la receta
             cantidad_por_unidad = Decimal(str(insumo["cantidad_por_rendimiento"]))
-            cantidad_requerida = cantidad_por_unidad * unidades_totales
+            cantidad_requerida = cantidad_por_unidad * cantidad_batch
             
             # Obtener stock disponible
             stock_disponible = self.repository.get_stock_disponible_insumo(db, insumo["id_insumo"])
@@ -162,9 +162,9 @@ class ProduccionService(ProduccionServiceInterface):
                 if insumo["es_opcional"]:
                     continue
                 
-                # Calcular cantidad requerida: cantidad_por_unidad × unidades_totales
+                # Calcular cantidad requerida: cantidad_por_rendimiento × cantidad_batch
                 cantidad_por_unidad = Decimal(str(insumo["cantidad_por_rendimiento"]))
-                cantidad_requerida = cantidad_por_unidad * unidades_totales
+                cantidad_requerida = cantidad_por_unidad * request.cantidad_batch
                 
                 # Descontar usando FEFO y crear movimientos
                 # AHORA usa id_produccion como id_documento_origen

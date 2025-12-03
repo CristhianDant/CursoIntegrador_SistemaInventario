@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     HOST_DB: str
 
+    # Base de datos de tests
+    TEST_DATABASE_URL: str = ""
+
     # Configuración de Email (Gmail SMTP)
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
