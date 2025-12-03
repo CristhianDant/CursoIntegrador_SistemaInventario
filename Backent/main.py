@@ -26,6 +26,7 @@ from modules.email_service import router as email_router
 from modules.email_service.service import EmailService
 from modules.promociones import promocion_router
 from modules.reportes import router as reportes_router
+from modules.alertas import router as alertas_router
 from database import SessionLocal
 
 # Configurar el logging antes de crear la aplicación
@@ -71,6 +72,8 @@ app.include_router(movimiento_productos_terminados_router.router, prefix="/api/v
 app.include_router(produccion_router.router, prefix="/api/v1/produccion", tags=["Produccion"])
 app.include_router(ventas_router.router, prefix="/api/v1/ventas", tags=["Ventas"])
 app.include_router(reportes_router.router, prefix="/api/v1/reportes", tags=["Reportes"])
+app.include_router(alertas_router.router, prefix="/api/v1/alertas", tags=["Alertas"])
+app.include_router(promocion_router, prefix="/api/v1/promociones", tags=["Promociones"])
 
 
 @app.get("/")

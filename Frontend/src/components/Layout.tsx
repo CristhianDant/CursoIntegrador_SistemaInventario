@@ -13,7 +13,8 @@ import {
   Building,
   Wrench,
   Truck,
-  Shield
+  Shield,
+  ShoppingCart
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "./ui/utils";
@@ -33,6 +34,7 @@ interface LayoutProps {
 // Cada item de menú tiene un módulo de permisos requerido
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: Home, modulo: 'DASHBOARD' },
+  { id: 'sales-point', label: 'Punto de Venta', icon: ShoppingCart, modulo: 'VENTAS' },
   { id: 'inventory', label: 'Insumos', icon: Package, modulo: 'INSUMOS' },
   { id: 'recipes', label: 'Recetas', icon: ChefHat, modulo: 'RECETAS' },
   { id: 'purchase-orders', label: 'Órdenes de Compra', icon: Wrench, modulo: 'COMPRAS' },

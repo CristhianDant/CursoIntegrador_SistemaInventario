@@ -47,9 +47,9 @@ class Notificacion(Base):
     fecha_creacion = Column(TIMESTAMP(timezone=True), server_default=func.now(), index=True)
     fecha_lectura = Column(TIMESTAMP(timezone=True), nullable=True)
     
-    # Relaciones
-    insumo = relationship("Insumo", foreign_keys=[id_insumo])
-    ingreso_detalle = relationship("IngresoProductoDetalle", foreign_keys=[id_ingreso_detalle])
+    # Relaciones - usando strings para evitar problemas de importación circular
+    insumo = relationship("Insumo", foreign_keys=[id_insumo], lazy="select")
+    ingreso_detalle = relationship("IngresoProductoDetalle", foreign_keys=[id_ingreso_detalle], lazy="select")
     
     def __repr__(self):
         return f"<Notificacion {self.id_notificacion}: {self.tipo} - {self.titulo}>"

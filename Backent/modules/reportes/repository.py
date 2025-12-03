@@ -317,6 +317,225 @@ class ReportesRepository(ReportesRepositoryInterface):
             for r in resultado
         ]
     
+    # ==================== MÉTODOS FALTANTES PARA INTERFACE ====================
+    
+    def obtener_tasa_merma_periodo(
+        self,
+        fecha_inicio: date,
+        fecha_fin: date
+    ) -> Decimal:
+        """Calcula la tasa de merma del período."""
+        from modules.calidad_desperdicio_merma.model import CalidadDesperdicioMerma
+        from modules.gestion_almacen_inusmos.movimiento_insumos.model import MovimientoInsumo
+        
+        # Total de mermas del período
+        mermas = self.db.query(
+            func.coalesce(func.sum(CalidadDesperdicioMerma.cantidad), 0).label('total_merma')
+        ).filter(
+            CalidadDesperdicioMerma.anulado == False,
+            func.date(CalidadDesperdicioMerma.fecha_caso) >= fecha_inicio,
+            func.date(CalidadDesperdicioMerma.fecha_caso) <= fecha_fin
+        ).first()
+        
+        # Total de movimientos (entradas) del período
+        movimientos = self.db.query(
+            func.coalesce(func.sum(MovimientoInsumo.cantidad), 0).label('total_mov')
+        ).filter(
+            MovimientoInsumo.anulado == False,
+            MovimientoInsumo.tipo_movimiento == 'ENTRADA',
+            func.date(MovimientoInsumo.fecha_movimiento) >= fecha_inicio,
+            func.date(MovimientoInsumo.fecha_movimiento) <= fecha_fin
+        ).first()
+        
+        total_merma = Decimal(str(mermas.total_merma or 0))
+        total_mov = Decimal(str(movimientos.total_mov or 1))  # Evitar división por cero
+        
+        if total_mov == 0:
+            return Decimal('0')
+        
+        return (total_merma / total_mov) * 100
+    
+    def obtener_rotacion_inventario(
+        self,
+        fecha_inicio: date,
+        fecha_fin: date
+    ) -> Decimal:
+        """Calcula la rotación de inventario del período."""
+        from modules.gestion_almacen_productos.ventas.model import Venta, VentaDetalle
+        from modules.productos_terminados.model import ProductoTerminado
+        
+        # Costo de ventas (aproximado como el subtotal de las ventas)
+        costo_ventas = self.db.query(
+            func.coalesce(func.sum(VentaDetalle.subtotal), 0).label('costo')
+        ).join(
+            Venta, VentaDetalle.id_venta == Venta.id_venta
+        ).filter(
+            Venta.anulado == False,
+            func.date(Venta.fecha_venta) >= fecha_inicio,
+            func.date(Venta.fecha_venta) <= fecha_fin
+        ).first()
+        
+        # Inventario promedio (stock actual * precio)
+        inventario = self.db.query(
+            func.coalesce(func.sum(ProductoTerminado.stock_actual * ProductoTerminado.precio_venta), 0).label('valor')
+        ).filter(
+            ProductoTerminado.anulado == False
+        ).first()
+        
+        costo = Decimal(str(costo_ventas.costo or 0))
+        valor_inv = Decimal(str(inventario.valor or 1))  # Evitar división por cero
+        
+        if valor_inv == 0:
+            return Decimal('0')
+        
+        # Rotación anualizada
+        dias_periodo = (fecha_fin - fecha_inicio).days + 1
+        factor_anualizacion = Decimal('365') / Decimal(str(dias_periodo))
+        
+        return (costo / valor_inv) * factor_anualizacion
+    
+    def obtener_valor_inventario_actual(self) -> Decimal:
+        """Obtiene el valor total del inventario actual."""
+        from modules.productos_terminados.model import ProductoTerminado
+        from modules.gestion_almacen_inusmos.ingresos_insumos.model import IngresoProductoDetalle
+        
+        # Valor de productos terminados
+        valor_productos = self.db.query(
+            func.coalesce(func.sum(ProductoTerminado.stock_actual * ProductoTerminado.precio_venta), 0).label('valor')
+        ).filter(
+            ProductoTerminado.anulado == False
+        ).first()
+        
+        # Valor de insumos (stock restante * precio unitario del lote)
+        valor_insumos = self.db.query(
+            func.coalesce(func.sum(IngresoProductoDetalle.cantidad_restante * IngresoProductoDetalle.precio_unitario), 0).label('valor')
+        ).filter(
+            IngresoProductoDetalle.cantidad_restante > 0
+        ).first()
+        
+        total_productos = Decimal(str(valor_productos.valor or 0))
+        total_insumos = Decimal(str(valor_insumos.valor or 0))
+        
+        return total_productos + total_insumos
+    
+    def obtener_rotacion_por_producto(
+        self,
+        fecha_inicio: date,
+        fecha_fin: date,
+        limite: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Obtiene la rotación de cada producto en el período."""
+        from modules.gestion_almacen_productos.ventas.model import Venta, VentaDetalle
+        from modules.productos_terminados.model import ProductoTerminado
+        
+        dias_periodo = (fecha_fin - fecha_inicio).days + 1
+        
+        # Subquery para ventas del período
+        subquery = self.db.query(
+            VentaDetalle.id_producto,
+            func.sum(VentaDetalle.cantidad).label('vendido'),
+            func.sum(VentaDetalle.subtotal).label('valor_vendido')
+        ).join(
+            Venta, VentaDetalle.id_venta == Venta.id_venta
+        ).filter(
+            Venta.anulado == False,
+            func.date(Venta.fecha_venta) >= fecha_inicio,
+            func.date(Venta.fecha_venta) <= fecha_fin
+        ).group_by(
+            VentaDetalle.id_producto
+        ).subquery()
+        
+        # Query principal
+        resultado = self.db.query(
+            ProductoTerminado.id_producto,
+            ProductoTerminado.codigo_producto.label('codigo'),
+            ProductoTerminado.nombre,
+            ProductoTerminado.stock_actual,
+            ProductoTerminado.precio_venta,
+            func.coalesce(subquery.c.vendido, 0).label('cantidad_vendida'),
+            func.coalesce(subquery.c.valor_vendido, 0).label('valor_vendido')
+        ).outerjoin(
+            subquery, ProductoTerminado.id_producto == subquery.c.id_producto
+        ).filter(
+            ProductoTerminado.anulado == False
+        ).order_by(
+            desc('cantidad_vendida')
+        ).limit(limite).all()
+        
+        items = []
+        for r in resultado:
+            stock = Decimal(str(r.stock_actual or 0))
+            vendido = Decimal(str(r.cantidad_vendida or 0))
+            valor_inventario = stock * Decimal(str(r.precio_venta or 0))
+            
+            # Calcular rotación
+            if valor_inventario > 0 and vendido > 0:
+                rotacion = (Decimal(str(r.valor_vendido or 0)) / valor_inventario) * (Decimal('365') / Decimal(str(dias_periodo)))
+            else:
+                rotacion = Decimal('0')
+            
+            items.append({
+                'id_producto': r.id_producto,
+                'codigo': r.codigo,
+                'nombre': r.nombre,
+                'stock_actual': stock,
+                'cantidad_vendida': vendido,
+                'valor_vendido': Decimal(str(r.valor_vendido or 0)),
+                'valor_inventario': valor_inventario,
+                'rotacion_anualizada': round(rotacion, 2),
+                'dias_inventario': round(Decimal(str(dias_periodo)) * stock / vendido, 0) if vendido > 0 else None
+            })
+        
+        return items
+    
+    def obtener_productos_sin_movimiento(
+        self,
+        dias: int = 30
+    ) -> List[Dict[str, Any]]:
+        """Obtiene productos sin movimiento en los últimos X días."""
+        from modules.gestion_almacen_productos.ventas.model import Venta, VentaDetalle
+        from modules.productos_terminados.model import ProductoTerminado
+        
+        fecha_limite = date.today() - timedelta(days=dias)
+        
+        # Subquery para productos con ventas recientes
+        productos_con_venta = self.db.query(
+            VentaDetalle.id_producto
+        ).join(
+            Venta, VentaDetalle.id_venta == Venta.id_venta
+        ).filter(
+            Venta.anulado == False,
+            func.date(Venta.fecha_venta) >= fecha_limite
+        ).distinct().subquery()
+        
+        # Productos sin ventas recientes
+        resultado = self.db.query(
+            ProductoTerminado.id_producto,
+            ProductoTerminado.codigo_producto.label('codigo'),
+            ProductoTerminado.nombre,
+            ProductoTerminado.stock_actual,
+            ProductoTerminado.precio_venta
+        ).outerjoin(
+            productos_con_venta, ProductoTerminado.id_producto == productos_con_venta.c.id_producto
+        ).filter(
+            ProductoTerminado.anulado == False,
+            ProductoTerminado.stock_actual > 0,
+            productos_con_venta.c.id_producto == None  # Sin ventas recientes
+        ).all()
+        
+        return [
+            {
+                'id_producto': r.id_producto,
+                'codigo': r.codigo,
+                'nombre': r.nombre,
+                'stock_actual': Decimal(str(r.stock_actual or 0)),
+                'valor_inventario': Decimal(str(r.stock_actual or 0)) * Decimal(str(r.precio_venta or 0)),
+                'dias_sin_movimiento': dias,
+                'alerta': 'REVISAR' if Decimal(str(r.stock_actual or 0)) > 0 else 'OK'
+            }
+            for r in resultado
+        ]
+    
     # ==================== ROTACIÓN ====================
     
     def obtener_rotacion_productos_terminados(

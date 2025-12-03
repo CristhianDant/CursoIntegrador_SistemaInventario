@@ -61,6 +61,9 @@ class Insumo(InsumoBase):
     id_insumo: int
     fecha_registro: datetime
     anulado: bool
+    # Campos calculados (no vienen del modelo, se calculan en el servicio)
+    stock_actual: Optional[Decimal] = Decimal('0')
+    precio_promedio: Optional[Decimal] = Decimal('0')
 
     model_config = {
         "from_attributes": True,
@@ -76,7 +79,9 @@ class Insumo(InsumoBase):
                     "perecible": True,
                     "categoria": "Harinas",
                     "fecha_registro": "2025-01-15T10:30:00",
-                    "anulado": False
+                    "anulado": False,
+                    "stock_actual": 50.0,
+                    "precio_promedio": 3.50
                 },
                 {
                     "id_insumo": 2,
@@ -88,7 +93,9 @@ class Insumo(InsumoBase):
                     "perecible": False,
                     "categoria": "Edulcorantes",
                     "fecha_registro": "2025-01-16T14:20:00",
-                    "anulado": False
+                    "anulado": False,
+                    "stock_actual": 25.0,
+                    "precio_promedio": 2.00
                 }
             ]
         }

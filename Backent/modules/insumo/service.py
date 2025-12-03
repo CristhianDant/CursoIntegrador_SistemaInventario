@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from decimal import Decimal
 from modules.insumo.repository import InsumoRepository
 from modules.insumo.schemas import Insumo, InsumoCreate, InsumoUpdate
 from .service_interface import InsumoServiceInterface
@@ -29,12 +30,54 @@ class InsumoService(InsumoServiceInterface):
 
     def get_insumos(self, skip: int = 0, limit: int = 100) -> list[Insumo]:
         insumos = self.repository.get_insumos(skip, limit)
-        return [Insumo.model_validate(i) for i in insumos]
+        
+        # Obtener stocks y precios calculados
+        stocks = self.repository.get_stock_actual_por_insumo()
+        precios = self.repository.get_precio_promedio_por_insumo()
+        
+        # Agregar campos calculados a cada insumo
+        resultado = []
+        for insumo in insumos:
+            insumo_dict = {
+                'id_insumo': insumo.id_insumo,
+                'codigo': insumo.codigo,
+                'nombre': insumo.nombre,
+                'descripcion': insumo.descripcion,
+                'unidad_medida': insumo.unidad_medida,
+                'stock_minimo': insumo.stock_minimo,
+                'perecible': insumo.perecible,
+                'categoria': insumo.categoria,
+                'fecha_registro': insumo.fecha_registro,
+                'anulado': insumo.anulado,
+                'stock_actual': stocks.get(insumo.id_insumo, Decimal('0')),
+                'precio_promedio': precios.get(insumo.id_insumo, Decimal('0'))
+            }
+            resultado.append(Insumo(**insumo_dict))
+        
+        return resultado
 
     def get_insumo(self, insumo_id: int) -> Insumo | None:
         db_insumo = self.repository.get_insumo(insumo_id)
         if db_insumo:
-            return Insumo.model_validate(db_insumo)
+            # Obtener stocks y precios calculados
+            stocks = self.repository.get_stock_actual_por_insumo()
+            precios = self.repository.get_precio_promedio_por_insumo()
+            
+            insumo_dict = {
+                'id_insumo': db_insumo.id_insumo,
+                'codigo': db_insumo.codigo,
+                'nombre': db_insumo.nombre,
+                'descripcion': db_insumo.descripcion,
+                'unidad_medida': db_insumo.unidad_medida,
+                'stock_minimo': db_insumo.stock_minimo,
+                'perecible': db_insumo.perecible,
+                'categoria': db_insumo.categoria,
+                'fecha_registro': db_insumo.fecha_registro,
+                'anulado': db_insumo.anulado,
+                'stock_actual': stocks.get(db_insumo.id_insumo, Decimal('0')),
+                'precio_promedio': precios.get(db_insumo.id_insumo, Decimal('0'))
+            }
+            return Insumo(**insumo_dict)
         return None
 
     def update_insumo(self, insumo_id: int, insumo: InsumoUpdate) -> Insumo | None:

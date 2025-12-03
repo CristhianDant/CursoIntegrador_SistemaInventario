@@ -265,21 +265,61 @@ export function SupplyEntryManager() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validar que todos los detalles tengan fecha de vencimiento
+    const detallesSinVencimiento = (formData.detalles || []).filter(d => d.id_insumo > 0 && !d.fecha_vencimiento);
+    if (detallesSinVencimiento.length > 0) {
+      toast.error('Todos los insumos deben tener una fecha de vencimiento para el control de lotes FEFO');
+      return;
+    }
+    
+    // Validar que haya al menos un detalle
+    if (!formData.detalles || formData.detalles.length === 0) {
+      toast.error('Debe agregar al menos un insumo al ingreso');
+      return;
+    }
+    
     const url = editingEntry ? `${SUPPLY_ENTRY_API_URL}/${editingEntry.id_ingreso}` : SUPPLY_ENTRY_API_URL;
     const method = editingEntry ? 'PUT' : 'POST';
 
     // Limpiar los detalles para enviar solo campos requeridos por el backend
-    const detallesLimpios = (formData.detalles || []).map(d => ({
-      id_insumo: Number(d.id_insumo),
-      cantidad_ordenada: Number(d.cantidad_ordenada) || 0,
-      cantidad_ingresada: Number(d.cantidad_ingresada),
-      precio_unitario: Number(d.precio_unitario),
-      subtotal: Number(d.subtotal),
-      fecha_vencimiento: d.fecha_vencimiento ? new Date(d.fecha_vencimiento).toISOString() : null,
-    }));
+    // Para PUT: incluir id_ingreso_detalle si existe (para actualizar detalles existentes)
+    const detallesLimpios = (formData.detalles || []).map(d => {
+      const detalleLimpio: any = {
+        id_insumo: Number(d.id_insumo),
+        cantidad_ordenada: Number(d.cantidad_ordenada) || 0,
+        cantidad_ingresada: Number(d.cantidad_ingresada),
+        precio_unitario: Number(d.precio_unitario),
+        subtotal: Number(d.subtotal),
+        fecha_vencimiento: d.fecha_vencimiento ? new Date(d.fecha_vencimiento).toISOString() : null,
+      };
+      
+      // Para PUT: incluir id_ingreso_detalle si existe para identificar detalles existentes
+      if (editingEntry && d.id_ingreso_detalle) {
+        detalleLimpio.id_ingreso_detalle = d.id_ingreso_detalle;
+      }
+      
+      return detalleLimpio;
+    });
 
-    // Asegurarse de que los campos de fecha tengan el formato correcto
-    const body = {
+    // Construir body según sea creación (POST) o actualización (PUT)
+    let body: any;
+    
+    if (editingEntry) {
+      // PUT: Solo enviar campos permitidos por IngresoProductoUpdate
+      body = {
+        numero_documento: formData.numero_documento,
+        tipo_documento: formData.tipo_documento,
+        fecha_ingreso: formData.fecha_ingreso ? new Date(formData.fecha_ingreso).toISOString() : undefined,
+        fecha_documento: formData.fecha_documento ? new Date(formData.fecha_documento).toISOString() : undefined,
+        observaciones: formData.observaciones || null,
+        estado: formData.estado || "COMPLETADO",
+        monto_total: formData.monto_total || 0,
+        detalles: detallesLimpios,
+      };
+    } else {
+      // POST: Enviar todos los campos para creación
+      body = {
         numero_ingreso: formData.numero_ingreso,
         id_orden_compra: formData.id_orden_compra || null,
         numero_documento: formData.numero_documento,
@@ -294,22 +334,44 @@ export function SupplyEntryManager() {
         monto_total: formData.monto_total || 0,
         anulado: false,
         detalles: detallesLimpios,
-    };
+      };
+    }
 
     try {
+      console.log('Enviando a:', url);
+      console.log('Método:', method);
+      console.log('Body:', JSON.stringify(body, null, 2));
+      
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      
+      const responseData = await response.json();
+      console.log('Respuesta del servidor:', responseData);
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.data || error.message || 'Error al guardar el ingreso');
+        // Extraer mensaje de error detallado
+        let errorMessage = 'Error al guardar el ingreso';
+        if (responseData.detail) {
+          if (Array.isArray(responseData.detail)) {
+            errorMessage = responseData.detail.map((d: any) => `${d.loc?.join('.')}: ${d.msg}`).join(', ');
+          } else {
+            errorMessage = responseData.detail;
+          }
+        } else if (responseData.data) {
+          errorMessage = responseData.data;
+        } else if (responseData.message) {
+          errorMessage = responseData.message;
+        }
+        throw new Error(errorMessage);
       }
       toast.success(editingEntry ? 'Ingreso actualizado correctamente' : 'Ingreso creado correctamente');
       await loadAllData(false);
       setIsDialogOpen(false);
     } catch (error) {
+      console.error('Error completo:', error);
       toast.error(error instanceof Error ? error.message : 'Error desconocido al guardar el ingreso');
     }
   };
@@ -529,9 +591,41 @@ export function SupplyEntryManager() {
                     <Input id="fecha_documento" type="date" value={formData.fecha_documento || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(p => ({ ...p, fecha_documento: e.target.value }))} required />
                 </div>
             </div>
-            <div className="space-y-2">
-                <Label htmlFor="observaciones">Observaciones</Label>
-                <Textarea id="observaciones" value={formData.observaciones || ''} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(p => ({ ...p, observaciones: e.target.value }))} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label htmlFor="observaciones">Observaciones</Label>
+                    <Textarea id="observaciones" value={formData.observaciones || ''} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(p => ({ ...p, observaciones: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="estado">Estado del Ingreso</Label>
+                    <Select 
+                        onValueChange={(value: "PENDIENTE" | "COMPLETADO" | "ANULADO") => setFormData(p => ({ ...p, estado: value }))} 
+                        value={formData.estado || 'PENDIENTE'}
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Selecciona el estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="PENDIENTE">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                                    Pendiente
+                                </div>
+                            </SelectItem>
+                            <SelectItem value="COMPLETADO">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                                    Completado
+                                </div>
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                        {formData.estado === 'PENDIENTE' 
+                            ? '⚠️ Pendiente: El stock NO se actualiza hasta completar' 
+                            : '✅ Completado: El stock de insumos se actualizará'}
+                    </p>
+                </div>
             </div>
 
             <Separator />
@@ -568,7 +662,7 @@ export function SupplyEntryManager() {
                     </div>
                     
                     {/* Fila 2: Cantidades y Precio */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                       <div>
                         <label className="text-sm font-medium block mb-1">Cant. Ordenada</label>
                         <Input 
@@ -605,6 +699,17 @@ export function SupplyEntryManager() {
                         />
                         <p className="text-xs text-muted-foreground mt-1">De la orden de compra</p>
                       </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium block mb-1">Fecha Vencimiento *</label>
+                        <Input 
+                          type="date" 
+                          value={detail.fecha_vencimiento || ''} 
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDetailChange(index, 'fecha_vencimiento', e.target.value)}
+                          className={!detail.fecha_vencimiento ? 'border-orange-300' : ''}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Para control FEFO (lote)</p>
+                      </div>
                     </div>
                     
                     {/* Fila 3: Subtotal y Botón Eliminar */}
@@ -629,7 +734,7 @@ export function SupplyEntryManager() {
                     </div>
                     
                     {/* Indicador de diferencia */}
-                    {detail.cantidad_ingresada !== detail.cantidad_ordenada && (
+                    {detail.cantidad_ingresada !== detail.cantidad_ordenada && detail.cantidad_ordenada > 0 && (
                       <div className={`text-xs p-2 rounded ${
                         detail.cantidad_ingresada < detail.cantidad_ordenada 
                           ? 'bg-yellow-50 text-yellow-700' 
@@ -639,6 +744,24 @@ export function SupplyEntryManager() {
                           ? `⚠️ Faltan ${detail.cantidad_ordenada - detail.cantidad_ingresada} unidades`
                           : `✓ ${detail.cantidad_ingresada - detail.cantidad_ordenada} unidades extra`
                         }
+                      </div>
+                    )}
+                    
+                    {/* Indicador de lote nuevo */}
+                    <div className="flex items-center gap-2 text-xs p-2 rounded bg-blue-50 text-blue-700">
+                      <Package className="h-3 w-3" />
+                      <span>
+                        <strong>Nuevo lote:</strong> Este ingreso creará un lote nuevo para el sistema FEFO
+                        {detail.fecha_vencimiento && (
+                          <> - Vence: <strong>{new Date(detail.fecha_vencimiento).toLocaleDateString()}</strong></>
+                        )}
+                      </span>
+                    </div>
+                    
+                    {/* Alerta si no tiene fecha de vencimiento */}
+                    {!detail.fecha_vencimiento && detail.id_insumo > 0 && (
+                      <div className="text-xs p-2 rounded bg-orange-50 text-orange-700">
+                        ⚠️ <strong>Importante:</strong> La fecha de vencimiento es requerida para el control de lotes FEFO
                       </div>
                     )}
                   </div>

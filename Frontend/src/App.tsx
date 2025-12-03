@@ -13,6 +13,7 @@ import { AlertsManager } from "./components/AlertsManager";
 import { ReportsManager } from "./components/ReportsManager";
 import { SettingsManager } from "./components/SettingsManager";
 import { SupplyEntryManager } from "./components/SupplyEntryManager";
+import { SalesPointManager } from "./components/SalesPointManager";
 import { TypewriterSplash } from './components/TypewriterSplash';
 import { Toaster } from "./components/ui/sonner";
 
@@ -29,6 +30,7 @@ const pageToModule: Record<string, string> = {
   'alerts': 'INVENTARIO',
   'reports': 'REPORTES',
   'settings': 'CONFIGURACION',
+  'sales-point': 'VENTAS',
 };
 
 function AppContent() {
@@ -93,6 +95,8 @@ function AppContent() {
         return <ReportsManager />;
       case "settings":
         return <SettingsManager />;
+      case "sales-point":
+        return <SalesPointManager />;
       default:
         return <Dashboard />;
     }

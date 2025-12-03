@@ -76,19 +76,7 @@ interface OrdenDeCompra {
   nombre_user_creador?: string;
 }
 
-// Datos de ejemplo (reemplazar con llamadas a la API)
-const availableSuppliers = [
-    { id: 1, name: "Proveedor de Harinas S.A." },
-    { id: 2, name: "Distribuidora de Lácteos del Norte" },
-    { id: 3, name: "Importadora de Chocolates Belgas" },
-];
-
-const availableIngredients = [
-    { id: 1, name: "Harina de trigo", unit: "kg", costPerUnit: 1.2 },
-    { id: 2, name: "Azúcar refinada", unit: "kg", costPerUnit: 2.5 },
-    { id: 3, name: "Huevos frescos", unit: "unidades", costPerUnit: 0.33 },
-    { id: 4, name: "Mantequilla", unit: "kg", costPerUnit: 8.5 },
-];
+// Los proveedores e insumos ahora se cargan desde la API en loadAllData()
 
 export function PurchaseOrderManager() {
   const { canWrite } = useAuth();
@@ -183,22 +171,64 @@ export function PurchaseOrderManager() {
     return { subTotal, igv, total };
   };
 
-  const handleDetailChange = (index: number, field: keyof OrdenDeCompraDetalle, value: any) => {
+  // Buscar el último precio de un insumo con un proveedor específico
+  const buscarUltimoPrecio = async (idInsumo: number, idProveedor: number): Promise<number | null> => {
+    try {
+      // Buscar en órdenes de compra anteriores del mismo proveedor
+      const response = await fetch(`${ORDEN_COMPRA_API_URL}?id_proveedor=${idProveedor}`);
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      const ordenes = Array.isArray(data) ? data : (data.data || []);
+      
+      // Filtrar órdenes completadas/terminadas y buscar el insumo
+      for (const orden of ordenes) {
+        if (orden.estado === 'COMPLETADO' || orden.estado === 'TERMINADO') {
+          const detalle = (orden.detalles || []).find((d: any) => d.id_insumo === idInsumo);
+          if (detalle && detalle.precio_unitario > 0) {
+            return detalle.precio_unitario;
+          }
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error buscando último precio:', error);
+      return null;
+    }
+  };
+
+  const handleDetailChange = async (index: number, field: keyof OrdenDeCompraDetalle, value: any) => {
     const newDetails = [...(formData.detalles || [])];
     const detail = { ...newDetails[index] };
 
     if (field === 'id_insumo') {
-        const selectedIngredient = availableIngredients.find(ing => ing.id === parseInt(value));
-        if (selectedIngredient) {
-            detail.id_insumo = selectedIngredient.id;
-            detail.precio_unitario = selectedIngredient.costPerUnit;
-            detail.nombre_insumo = selectedIngredient.name;
+        const idInsumo = parseInt(value);
+        // Buscar el insumo en la lista real de insumos de la API
+        const selectedInsumo = insumos.find(i => (i.id_insumo || i.id) === idInsumo);
+        if (selectedInsumo) {
+            detail.id_insumo = idInsumo;
+            detail.nombre_insumo = selectedInsumo.nombre_insumo || selectedInsumo.nombre || selectedInsumo.name || '';
+            
+            // Buscar último precio como referencia (si hay proveedor seleccionado)
+            if (formData.id_proveedor && formData.id_proveedor > 0) {
+                const ultimoPrecio = await buscarUltimoPrecio(idInsumo, formData.id_proveedor);
+                if (ultimoPrecio !== null) {
+                    detail.precio_unitario = ultimoPrecio;
+                    // Mostrar que es precio de referencia
+                    console.log(`Precio de referencia encontrado para ${detail.nombre_insumo}: ${ultimoPrecio}`);
+                } else {
+                    // Sin referencia, dejar en 0 para que el usuario ingrese
+                    detail.precio_unitario = 0;
+                }
+            } else {
+                detail.precio_unitario = 0;
+            }
         }
     } else {
         (detail as any)[field] = value;
     }
 
-    if (field === 'cantidad' || field === 'precio_unitario') {
+    if (field === 'cantidad' || field === 'precio_unitario' || field === 'id_insumo') {
         const cantidad = parseFloat(String(detail.cantidad)) || 0;
         const precio = parseFloat(String(detail.precio_unitario)) || 0;
         detail.sub_total = cantidad * precio;
@@ -667,12 +697,22 @@ export function PurchaseOrderManager() {
                     </div>
                     <div className="col-span-6 md:col-span-2">
                       <label className="text-xs text-muted-foreground md:hidden">Precio Unit.</label>
-                      <Input
-                        type="number"
-                        placeholder="Precio U."
-                        value={detail.precio_unitario}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDetailChange(index, 'precio_unitario', e.target.value)}
-                      />
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Precio U."
+                          value={detail.precio_unitario}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDetailChange(index, 'precio_unitario', e.target.value)}
+                          className={detail.precio_unitario > 0 ? "pr-8" : ""}
+                        />
+                        {detail.precio_unitario > 0 && (
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-green-600" title="Precio de referencia (editable)">
+                            ✓
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="col-span-6 md:col-span-2">
                       <label className="text-xs text-muted-foreground md:hidden">Subtotal</label>

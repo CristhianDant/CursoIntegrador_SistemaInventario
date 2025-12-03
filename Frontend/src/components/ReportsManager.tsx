@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -6,7 +6,9 @@ import {
   Calendar, 
   Filter,
   Download,
-  Eye
+  Eye,
+  Loader2,
+  RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -16,6 +18,7 @@ import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { Alert, AlertDescription } from "./ui/alert";
 import { 
   ResponsiveContainer,
   BarChart,
@@ -31,8 +34,84 @@ import {
   Cell,
   Legend
 } from 'recharts';
+import { API_BASE_URL } from "../constants";
 
-// Mock data para los reportes
+// Interfaces basadas en los schemas del backend
+interface ProductoABC {
+  id_producto: number;
+  codigo: string;
+  nombre: string;
+  cantidad_vendida: number;
+  monto_total: number;
+  porcentaje_ventas: number;
+  porcentaje_acumulado: number;
+  clasificacion: string;
+  frecuencia_control: string;
+}
+
+interface ReporteABCResponse {
+  fecha_inicio: string;
+  fecha_fin: string;
+  total_ventas: number;
+  total_productos: number;
+  resumen: Record<string, any>;
+  productos_a: ProductoABC[];
+  productos_b: ProductoABC[];
+  productos_c: ProductoABC[];
+}
+
+interface KPIValue {
+  nombre: string;
+  valor: number;
+  unidad: string;
+  meta: number;
+  cumple_meta: boolean;
+  tendencia?: string;
+  detalle?: string;
+}
+
+interface KPIsResponse {
+  fecha: string;
+  merma_diaria: KPIValue;
+  productos_vencidos_hoy: KPIValue;
+  cumplimiento_fefo: KPIValue;
+  stock_critico: KPIValue;
+  rotacion_inventario: KPIValue;
+  kpis_cumplidos: number;
+  kpis_totales: number;
+  porcentaje_cumplimiento: number;
+}
+
+interface ItemRotacion {
+  id: number;
+  codigo: string;
+  nombre: string;
+  tipo: string;
+  stock_actual: number;
+  unidad_medida: string;
+  consumo_periodo: number;
+  dias_stock: number;
+  rotacion_periodo: number;
+  rotacion_anualizada: number;
+  clasificacion: string;
+}
+
+interface RotacionResponse {
+  fecha_inicio: string;
+  fecha_fin: string;
+  dias_periodo: number;
+  rotacion_promedio_anual: number;
+  meta_rotacion_anual: number;
+  cumple_meta: boolean;
+  total_items: number;
+  items_alta_rotacion: number;
+  items_media_rotacion: number;
+  items_baja_rotacion: number;
+  insumos: ItemRotacion[];
+  productos_terminados: ItemRotacion[];
+}
+
+// Mock data solo como fallback cuando no hay datos del backend
 const monthlyConsumption = [
   { month: 'Ene', harina: 120, azucar: 80, huevos: 200, mantequilla: 45 },
   { month: 'Feb', harina: 140, azucar: 95, huevos: 220, mantequilla: 52 },
@@ -42,57 +121,108 @@ const monthlyConsumption = [
   { month: 'Jun', harina: 150, azucar: 105, huevos: 245, mantequilla: 55 },
 ];
 
-const categoryDistribution = [
-  { name: 'Harinas', value: 35, color: '#f97316' },
-  { name: 'Lácteos', value: 25, color: '#3b82f6' },
-  { name: 'Endulzantes', value: 20, color: '#10b981' },
-  { name: 'Proteínas', value: 15, color: '#f59e0b' },
-  { name: 'Otros', value: 5, color: '#8b5cf6' },
-];
-
-const wasteData = [
-  { month: 'Ene', merma: 2.1, valor: 1200 },
-  { month: 'Feb', merma: 1.8, valor: 1050 },
-  { month: 'Mar', merma: 2.5, valor: 1450 },
-  { month: 'Abr', merma: 1.9, valor: 1100 },
-  { month: 'May', merma: 2.3, valor: 1300 },
-  { month: 'Jun', merma: 1.6, valor: 950 },
-];
-
-const topIngredients = [
-  { ingredient: 'Harina de trigo', consumption: 165, unit: 'kg', cost: 198, trend: 'up' },
-  { ingredient: 'Azúcar refinada', consumption: 120, unit: 'kg', cost: 300, trend: 'up' },
-  { ingredient: 'Huevos frescos', consumption: 260, unit: 'docenas', cost: 1040, trend: 'down' },
-  { ingredient: 'Mantequilla', consumption: 62, unit: 'kg', cost: 527, trend: 'up' },
-  { ingredient: 'Chocolate negro', consumption: 45, unit: 'kg', cost: 675, trend: 'stable' },
-];
-
-const supplierPerformance = [
-  { supplier: 'Molinos ABC', items: 8, onTime: 95, quality: 98, totalCost: 2400 },
-  { supplier: 'Lácteos Premium', items: 5, onTime: 88, quality: 96, totalCost: 1850 },
-  { supplier: 'Granja Los Robles', items: 3, onTime: 92, quality: 99, totalCost: 1200 },
-  { supplier: 'Azucarera XYZ', items: 4, onTime: 96, quality: 94, totalCost: 980 },
-  { supplier: 'Cacao Gourmet', items: 6, onTime: 85, quality: 97, totalCost: 1620 },
-];
+const COLORS = ['#f97316', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
 
 export function ReportsManager() {
   const [selectedPeriod, setSelectedPeriod] = useState("6months");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState(() => {
+    const date = new Date();
+    date.setMonth(date.getMonth() - 1);
+    return date.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  
+  // Estados para datos del backend
+  const [kpis, setKpis] = useState<KPIsResponse | null>(null);
+  const [abcReport, setAbcReport] = useState<ReporteABCResponse | null>(null);
+  const [rotacion, setRotacion] = useState<RotacionResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const getTrendIcon = (trend: string) => {
+  // Actualizar fechas según período seleccionado
+  useEffect(() => {
+    const now = new Date();
+    let start = new Date();
+    
+    switch (selectedPeriod) {
+      case "1month":
+        start.setMonth(now.getMonth() - 1);
+        break;
+      case "3months":
+        start.setMonth(now.getMonth() - 3);
+        break;
+      case "6months":
+        start.setMonth(now.getMonth() - 6);
+        break;
+      case "1year":
+        start.setFullYear(now.getFullYear() - 1);
+        break;
+      case "custom":
+        return; // No actualizar si es personalizado
+    }
+    
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(now.toISOString().split('T')[0]);
+  }, [selectedPeriod]);
+
+  const fetchReports = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const [kpisRes, abcRes, rotacionRes] = await Promise.allSettled([
+        fetch(`${API_BASE_URL}/v1/reportes/kpis?fecha=${today}`),
+        fetch(`${API_BASE_URL}/v1/reportes/abc?fecha_inicio=${startDate}&fecha_fin=${endDate}`),
+        fetch(`${API_BASE_URL}/v1/reportes/rotacion?fecha_inicio=${startDate}&fecha_fin=${endDate}`)
+      ]);
+
+      if (kpisRes.status === 'fulfilled' && kpisRes.value.ok) {
+        const data = await kpisRes.value.json();
+        setKpis(data.data || data);
+      }
+
+      if (abcRes.status === 'fulfilled' && abcRes.value.ok) {
+        const data = await abcRes.value.json();
+        setAbcReport(data.data || data);
+      }
+
+      if (rotacionRes.status === 'fulfilled' && rotacionRes.value.ok) {
+        const data = await rotacionRes.value.json();
+        setRotacion(data.data || data);
+      }
+
+    } catch (err) {
+      console.error('Error fetching reports:', err);
+      setError('Error al cargar los reportes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReports();
+  }, [startDate, endDate]);
+
+  const getTrendIcon = (trend?: string) => {
     switch (trend) {
-      case 'up':
+      case 'subiendo':
         return <TrendingUp className="h-4 w-4 text-green-600" />;
-      case 'down':
+      case 'bajando':
         return <TrendingDown className="h-4 w-4 text-red-600" />;
       default:
         return <div className="h-4 w-4 bg-gray-400 rounded-full" />;
     }
   };
 
-  const COLORS = ['#f97316', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+  // Preparar datos para gráfico de distribución ABC
+  const abcDistribution = abcReport ? [
+    { name: 'Categoría A', value: abcReport.productos_a.length, color: '#10b981' },
+    { name: 'Categoría B', value: abcReport.productos_b.length, color: '#f59e0b' },
+    { name: 'Categoría C', value: abcReport.productos_c.length, color: '#ef4444' },
+  ] : [];
 
   return (
     <div className="space-y-6">
@@ -103,11 +233,23 @@ export function ReportsManager() {
           <p className="text-muted-foreground">Análisis detallado de consumo, costos y rendimiento</p>
         </div>
         
-        <Button>
-          <Download className="h-4 w-4 mr-2" />
-          Exportar Reporte
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={fetchReports} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
+          <Button>
+            <Download className="h-4 w-4 mr-2" />
+            Exportar Reporte
+          </Button>
+        </div>
       </div>
+
+      {error && (
+        <Alert className="border-red-200 bg-red-50">
+          <AlertDescription className="text-red-600">{error}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Filtros */}
       <Card>
@@ -170,15 +312,342 @@ export function ReportsManager() {
       </Card>
 
       {/* Tabs de reportes */}
-      <Tabs defaultValue="consumption" className="space-y-4">
+      <Tabs defaultValue="kpis" className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="kpis">KPIs</TabsTrigger>
+          <TabsTrigger value="abc">Análisis ABC</TabsTrigger>
+          <TabsTrigger value="rotacion">Rotación</TabsTrigger>
           <TabsTrigger value="consumption">Consumo</TabsTrigger>
-          <TabsTrigger value="waste">Merma</TabsTrigger>
-          <TabsTrigger value="suppliers">Proveedores</TabsTrigger>
-          <TabsTrigger value="financial">Financiero</TabsTrigger>
         </TabsList>
 
-        {/* Reporte de Consumo */}
+        {/* KPIs Dashboard */}
+        <TabsContent value="kpis" className="space-y-6">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : kpis ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${kpis.merma_diaria.cumple_meta ? 'text-green-600' : 'text-red-600'}`}>
+                        {Number(kpis.merma_diaria.valor).toFixed(1)}{kpis.merma_diaria.unidad}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{kpis.merma_diaria.nombre}</p>
+                      <Badge variant={kpis.merma_diaria.cumple_meta ? 'default' : 'destructive'} className="mt-1">
+                        Meta: &lt;{kpis.merma_diaria.meta}{kpis.merma_diaria.unidad}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${kpis.productos_vencidos_hoy.cumple_meta ? 'text-green-600' : 'text-red-600'}`}>
+                        {kpis.productos_vencidos_hoy.valor}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{kpis.productos_vencidos_hoy.nombre}</p>
+                      <Badge variant={kpis.productos_vencidos_hoy.cumple_meta ? 'default' : 'destructive'} className="mt-1">
+                        Meta: {kpis.productos_vencidos_hoy.meta}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${kpis.cumplimiento_fefo.cumple_meta ? 'text-green-600' : 'text-red-600'}`}>
+                        {Number(kpis.cumplimiento_fefo.valor).toFixed(1)}{kpis.cumplimiento_fefo.unidad}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{kpis.cumplimiento_fefo.nombre}</p>
+                      <Badge variant={kpis.cumplimiento_fefo.cumple_meta ? 'default' : 'destructive'} className="mt-1">
+                        Meta: &gt;{kpis.cumplimiento_fefo.meta}{kpis.cumplimiento_fefo.unidad}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${kpis.stock_critico.cumple_meta ? 'text-green-600' : 'text-orange-600'}`}>
+                        {kpis.stock_critico.valor}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{kpis.stock_critico.nombre}</p>
+                      <Badge variant={kpis.stock_critico.cumple_meta ? 'default' : 'secondary'} className="mt-1">
+                        Meta: &lt;{kpis.stock_critico.meta}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${kpis.rotacion_inventario.cumple_meta ? 'text-green-600' : 'text-orange-600'}`}>
+                        {Number(kpis.rotacion_inventario.valor).toFixed(1)}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{kpis.rotacion_inventario.nombre}</p>
+                      <Badge variant={kpis.rotacion_inventario.cumple_meta ? 'default' : 'secondary'} className="mt-1">
+                        Meta: &gt;{kpis.rotacion_inventario.meta}/año
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold">Resumen de Cumplimiento</h3>
+                      <p className="text-muted-foreground">
+                        {kpis.kpis_cumplidos} de {kpis.kpis_totales} KPIs cumplidos
+                      </p>
+                    </div>
+                    <div className={`text-3xl font-bold ${Number(kpis.porcentaje_cumplimiento) >= 80 ? 'text-green-600' : 'text-orange-600'}`}>
+                      {Number(kpis.porcentaje_cumplimiento).toFixed(0)}%
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="pt-8 text-center">
+                <p className="text-muted-foreground">No hay datos de KPIs disponibles</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Análisis ABC */}
+        <TabsContent value="abc" className="space-y-6">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : abcReport ? (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribución ABC</CardTitle>
+                    <CardDescription>
+                      Clasificación de productos por contribución a ventas
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={abcDistribution}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, value }) => `${name}: ${value}`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {abcDistribution.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Resumen del Análisis</CardTitle>
+                    <CardDescription>
+                      Período: {abcReport.fecha_inicio} a {abcReport.fecha_fin}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex justify-between">
+                      <span>Total Ventas:</span>
+                      <span className="font-bold">${Number(abcReport.total_ventas).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total Productos:</span>
+                      <span className="font-bold">{abcReport.total_productos}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Categoría A (70% ventas):</span>
+                      <Badge className="bg-green-100 text-green-800">{abcReport.productos_a.length} productos</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Categoría B (20% ventas):</span>
+                      <Badge className="bg-yellow-100 text-yellow-800">{abcReport.productos_b.length} productos</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Categoría C (10% ventas):</span>
+                      <Badge className="bg-red-100 text-red-800">{abcReport.productos_c.length} productos</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Productos Categoría A - Control DIARIO</CardTitle>
+                  <CardDescription>Productos que representan el 70% de las ventas</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Código</TableHead>
+                        <TableHead>Producto</TableHead>
+                        <TableHead>Cantidad Vendida</TableHead>
+                        <TableHead>Monto Total</TableHead>
+                        <TableHead>% Ventas</TableHead>
+                        <TableHead>% Acumulado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {abcReport.productos_a.slice(0, 10).map((producto) => (
+                        <TableRow key={producto.id_producto}>
+                          <TableCell>{producto.codigo}</TableCell>
+                          <TableCell className="font-medium">{producto.nombre}</TableCell>
+                          <TableCell>{Number(producto.cantidad_vendida).toFixed(0)}</TableCell>
+                          <TableCell>${Number(producto.monto_total).toLocaleString()}</TableCell>
+                          <TableCell>{Number(producto.porcentaje_ventas).toFixed(1)}%</TableCell>
+                          <TableCell>{Number(producto.porcentaje_acumulado).toFixed(1)}%</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="pt-8 text-center">
+                <p className="text-muted-foreground">No hay datos de análisis ABC disponibles para el período seleccionado</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Rotación de Inventario */}
+        <TabsContent value="rotacion" className="space-y-6">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : rotacion ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${rotacion.cumple_meta ? 'text-green-600' : 'text-orange-600'}`}>
+                        {Number(rotacion.rotacion_promedio_anual).toFixed(1)}x
+                      </div>
+                      <p className="text-sm text-muted-foreground">Rotación Promedio Anual</p>
+                      <Badge variant={rotacion.cumple_meta ? 'default' : 'secondary'} className="mt-1">
+                        Meta: {rotacion.meta_rotacion_anual}x/año
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">{rotacion.items_alta_rotacion}</div>
+                      <p className="text-sm text-muted-foreground">Alta Rotación</p>
+                      <p className="text-xs text-muted-foreground">≥12 veces/año</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-yellow-600">{rotacion.items_media_rotacion}</div>
+                      <p className="text-sm text-muted-foreground">Media Rotación</p>
+                      <p className="text-xs text-muted-foreground">6-12 veces/año</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-red-600">{rotacion.items_baja_rotacion}</div>
+                      <p className="text-sm text-muted-foreground">Baja Rotación</p>
+                      <p className="text-xs text-muted-foreground">&lt;6 veces/año</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Detalle de Rotación - Insumos</CardTitle>
+                  <CardDescription>
+                    Período: {rotacion.fecha_inicio} a {rotacion.fecha_fin} ({rotacion.dias_periodo} días)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Código</TableHead>
+                        <TableHead>Insumo</TableHead>
+                        <TableHead>Stock Actual</TableHead>
+                        <TableHead>Consumo</TableHead>
+                        <TableHead>Días Stock</TableHead>
+                        <TableHead>Rotación Anual</TableHead>
+                        <TableHead>Clasificación</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rotacion.insumos.slice(0, 15).map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.codigo}</TableCell>
+                          <TableCell className="font-medium">{item.nombre}</TableCell>
+                          <TableCell>{Number(item.stock_actual).toFixed(1)} {item.unidad_medida}</TableCell>
+                          <TableCell>{Number(item.consumo_periodo).toFixed(1)}</TableCell>
+                          <TableCell>{Number(item.dias_stock).toFixed(0)}</TableCell>
+                          <TableCell>{Number(item.rotacion_anualizada).toFixed(1)}x</TableCell>
+                          <TableCell>
+                            <Badge variant={
+                              item.clasificacion === 'alta' ? 'default' :
+                              item.clasificacion === 'media' ? 'secondary' : 'destructive'
+                            }>
+                              {item.clasificacion}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="pt-8 text-center">
+                <p className="text-muted-foreground">No hay datos de rotación disponibles para el período seleccionado</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Reporte de Consumo (mantiene datos mock por ahora) */}
+        {/* Reporte de Consumo (mantiene datos mock por ahora) */}
         <TabsContent value="consumption" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Gráfico de consumo mensual */}
@@ -209,236 +678,27 @@ export function ReportsManager() {
             {/* Distribución por categorías */}
             <Card>
               <CardHeader>
-                <CardTitle>Distribución por Categorías</CardTitle>
+                <CardTitle>Análisis de Costos por Mes</CardTitle>
                 <CardDescription>
-                  Porcentaje de uso por tipo de insumo
+                  Evolución del gasto mensual en insumos
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={categoryDistribution}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {categoryDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
+                  <BarChart data={monthlyConsumption.map((item) => ({
+                    month: item.month,
+                    total: (item.harina * 1.2) + (item.azucar * 2.5) + (item.huevos * 4.0) + (item.mantequilla * 8.5)
+                  }))}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => [`$${value}`, 'Costo Total']} />
+                    <Bar dataKey="total" fill="#f97316" />
+                  </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
-
-          {/* Top ingredientes */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Ingredientes por Consumo</CardTitle>
-              <CardDescription>
-                Los ingredientes más utilizados este período
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ingrediente</TableHead>
-                    <TableHead>Consumo</TableHead>
-                    <TableHead>Costo Total</TableHead>
-                    <TableHead>Tendencia</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {topIngredients.map((item, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{item.ingredient}</TableCell>
-                      <TableCell>{item.consumption} {item.unit}</TableCell>
-                      <TableCell>${item.cost}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          {getTrendIcon(item.trend)}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Reporte de Merma */}
-        <TabsContent value="waste" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-red-600">2.1%</div>
-                  <p className="text-sm text-muted-foreground">Promedio de merma</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-orange-600">$7.2K</div>
-                  <p className="text-sm text-muted-foreground">Pérdidas totales</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600">-15%</div>
-                  <p className="text-sm text-muted-foreground">vs. período anterior</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Evolución de la Merma</CardTitle>
-              <CardDescription>
-                Porcentaje de merma y valor monetario por mes
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={wasteData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip />
-                  <Bar yAxisId="left" dataKey="merma" fill="#f97316" name="% Merma" />
-                  <Bar yAxisId="right" dataKey="valor" fill="#3b82f6" name="Valor ($)" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Reporte de Proveedores */}
-        <TabsContent value="suppliers" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Rendimiento de Proveedores</CardTitle>
-              <CardDescription>
-                Evaluación del desempeño de cada proveedor
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Proveedor</TableHead>
-                    <TableHead>Items</TableHead>
-                    <TableHead>Puntualidad</TableHead>
-                    <TableHead>Calidad</TableHead>
-                    <TableHead>Costo Total</TableHead>
-                    <TableHead>Evaluación</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {supplierPerformance.map((supplier, index) => {
-                    const avgScore = (supplier.onTime + supplier.quality) / 2;
-                    const getScoreBadge = (score: number) => {
-                      if (score >= 95) return <Badge className="bg-green-100 text-green-800">Excelente</Badge>;
-                      if (score >= 90) return <Badge className="bg-blue-100 text-blue-800">Bueno</Badge>;
-                      if (score >= 85) return <Badge className="bg-yellow-100 text-yellow-800">Regular</Badge>;
-                      return <Badge className="bg-red-100 text-red-800">Deficiente</Badge>;
-                    };
-
-                    return (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{supplier.supplier}</TableCell>
-                        <TableCell>{supplier.items}</TableCell>
-                        <TableCell>{supplier.onTime}%</TableCell>
-                        <TableCell>{supplier.quality}%</TableCell>
-                        <TableCell>${supplier.totalCost.toLocaleString()}</TableCell>
-                        <TableCell>{getScoreBadge(avgScore)}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Reporte Financiero */}
-        <TabsContent value="financial" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">$15.4K</div>
-                  <p className="text-sm text-muted-foreground">Valor Inventario</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">$8.2K</div>
-                  <p className="text-sm text-muted-foreground">Compras del Mes</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">$1.2K</div>
-                  <p className="text-sm text-muted-foreground">Pérdidas por Merma</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">7.8%</div>
-                  <p className="text-sm text-muted-foreground">ROI Inventario</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Análisis de Costos por Categoría</CardTitle>
-              <CardDescription>
-                Distribución del gasto por tipo de insumo
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={monthlyConsumption.map((item, index) => ({
-                  month: item.month,
-                  total: (item.harina * 1.2) + (item.azucar * 2.5) + (item.huevos * 4.0) + (item.mantequilla * 8.5)
-                }))}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => [`$${value}`, 'Costo Total']} />
-                  <Bar dataKey="total" fill="#f97316" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>

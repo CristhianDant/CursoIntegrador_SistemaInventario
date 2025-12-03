@@ -18,6 +18,10 @@ class IngresoProductoDetalleBase(BaseModel):
 class IngresoProductoDetalleCreate(IngresoProductoDetalleBase):
     pass
 
+class IngresoProductoDetalleUpdate(IngresoProductoDetalleBase):
+    """Schema para actualizar detalles - incluye id_ingreso_detalle opcional para identificar detalles existentes"""
+    id_ingreso_detalle: Optional[int] = None  # Si se proporciona, se actualiza; si no, se crea nuevo
+
 class IngresoProductoDetalle(IngresoProductoDetalleBase):
     id_ingreso_detalle: int
     id_ingreso: int
@@ -52,7 +56,7 @@ class IngresoProductoUpdate(BaseModel):
     observaciones: Optional[str] = None
     estado: Optional[EstadoEnum] = None
     monto_total: Optional[Decimal] = None
-    detalles: Optional[List[IngresoProductoDetalleCreate]] = None
+    detalles: Optional[List[IngresoProductoDetalleUpdate]] = None  # Usa Update para poder enviar id_ingreso_detalle
 
 class IngresoProducto(IngresoProductoBase):
     id_ingreso: int

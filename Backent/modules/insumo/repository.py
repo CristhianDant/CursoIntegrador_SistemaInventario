@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
+from decimal import Decimal
 from modules.insumo.model import Insumo
 from modules.insumo.schemas import InsumoCreate, InsumoUpdate
 from modules.gestion_almacen_inusmos.ingresos_insumos.model import IngresoProducto, IngresoProductoDetalle
@@ -18,6 +19,51 @@ class InsumoRepository(InsumoRepositoryInterface):
 
     def get_insumos(self, skip: int = 0, limit: int = 100) -> list[Insumo]:
         return self.db.query(Insumo).filter(Insumo.anulado == False).offset(skip).limit(limit).all()
+
+    def get_stock_actual_por_insumo(self) -> dict:
+        """
+        Calcula el stock actual de cada insumo sumando cantidad_restante 
+        de todos los detalles de ingreso de ingresos COMPLETADOS y no anulados.
+        Retorna un diccionario {id_insumo: stock_actual}
+        """
+        resultados = (
+            self.db.query(
+                IngresoProductoDetalle.id_insumo,
+                func.coalesce(func.sum(IngresoProductoDetalle.cantidad_restante), 0).label('stock_actual')
+            )
+            .join(IngresoProducto, IngresoProductoDetalle.id_ingreso == IngresoProducto.id_ingreso)
+            .filter(
+                IngresoProducto.anulado == False,
+                IngresoProducto.estado == 'COMPLETADO'  # Solo ingresos completados
+            )
+            .group_by(IngresoProductoDetalle.id_insumo)
+            .all()
+        )
+        return {r.id_insumo: Decimal(str(r.stock_actual)) for r in resultados}
+
+    def get_precio_promedio_por_insumo(self) -> dict:
+        """
+        Calcula el precio promedio ponderado de cada insumo
+        basándose en los detalles de ingreso con cantidad_restante > 0.
+        Retorna un diccionario {id_insumo: precio_promedio}
+        """
+        # Precio promedio ponderado = SUM(cantidad_restante * precio_unitario) / SUM(cantidad_restante)
+        resultados = (
+            self.db.query(
+                IngresoProductoDetalle.id_insumo,
+                (func.sum(IngresoProductoDetalle.cantidad_restante * IngresoProductoDetalle.precio_unitario) /
+                 func.nullif(func.sum(IngresoProductoDetalle.cantidad_restante), 0)).label('precio_promedio')
+            )
+            .join(IngresoProducto, IngresoProductoDetalle.id_ingreso == IngresoProducto.id_ingreso)
+            .filter(
+                IngresoProducto.anulado == False,
+                IngresoProducto.estado == 'COMPLETADO',
+                IngresoProductoDetalle.cantidad_restante > 0
+            )
+            .group_by(IngresoProductoDetalle.id_insumo)
+            .all()
+        )
+        return {r.id_insumo: Decimal(str(r.precio_promedio or 0)) for r in resultados}
 
     def create_insumo(self, insumo: InsumoCreate) -> Insumo:
         db_insumo = Insumo(**insumo.model_dump())
