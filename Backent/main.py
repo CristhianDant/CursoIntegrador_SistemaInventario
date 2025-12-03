@@ -1,11 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from scalar_fastapi import get_scalar_api_reference , Layout
+from scalar_fastapi import get_scalar_api_reference, Layout
 from contextlib import asynccontextmanager
 import asyncio
 from loguru import logger
 
+from config import settings
 from utils.logging_config import setup_logging
+from middleware.request_id import RequestIDMiddleware
+
+# Módulos de la aplicación
 from modules.empresa import router as empresa_router
 from modules.proveedores import router as proveedores_router
 from modules.insumo import router as insumo_router
@@ -27,16 +31,75 @@ from modules.email_service.service import EmailService
 from modules.promociones import promocion_router
 from modules.reportes import router as reportes_router
 from modules.alertas import router as alertas_router
+from modules.health import router as health_router
 from database import SessionLocal
 
 # Configurar el logging antes de crear la aplicación
 setup_logging()
 
+
+# ==================== LIFECYCLE EVENTS ====================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Manejador de ciclo de vida de la aplicación.
+    
+    Startup:
+    - Inicializar scheduler de tareas
+    - Configurar métricas de Prometheus
+    
+    Shutdown:
+    - Detener scheduler de forma segura
+    - Limpiar recursos
+    """
+    # ===== STARTUP =====
+    logger.info("🚀 Iniciando aplicación...")
+    
+    # Inicializar y arrancar el scheduler
+    from core.scheduler import init_scheduler, start_scheduler
+    try:
+        init_scheduler()
+        start_scheduler()
+        logger.info("✅ Scheduler inicializado correctamente")
+    except Exception as e:
+        logger.error(f"❌ Error iniciando scheduler: {e}")
+    
+    # Establecer versión en HealthService
+    from modules.health.service import HealthService
+    HealthService.set_version(settings.APP_VERSION)
+    
+    logger.info(
+        f"✅ Aplicación iniciada - Version: {settings.APP_VERSION}, "
+        f"Environment: {settings.ENVIRONMENT}"
+    )
+    
+    yield  # La aplicación está corriendo
+    
+    # ===== SHUTDOWN =====
+    logger.info("🛑 Deteniendo aplicación...")
+    
+    # Detener scheduler
+    from core.scheduler import shutdown_scheduler
+    try:
+        shutdown_scheduler()
+        logger.info("✅ Scheduler detenido correctamente")
+    except Exception as e:
+        logger.error(f"❌ Error deteniendo scheduler: {e}")
+    
+    logger.info("👋 Aplicación detenida")
+
+
+# ==================== CREAR APLICACIÓN ====================
+
 app = FastAPI(
     title="API de Inventario",
     description="API RESTful para gestionar un sistema de inventario.",
-    version="1.0.0"
+    version=settings.APP_VERSION,
+    lifespan=lifespan
 )
+
+# ==================== CONFIGURAR MIDDLEWARE ====================
 
 # Configurar CORS
 origins = [
@@ -52,7 +115,43 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID"],  # Exponer header de request ID
 )
+
+# Middleware de Request ID para trazabilidad
+app.add_middleware(RequestIDMiddleware)
+
+
+# ==================== CONFIGURAR PROMETHEUS ====================
+
+if settings.ENABLE_METRICS:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    from prometheus_fastapi_instrumentator.metrics import Info, latency, requests, request_size, response_size
+    
+    # Configurar instrumentador
+    instrumentator = Instrumentator(
+        should_group_status_codes=True,
+        should_ignore_untemplated=True,
+        should_respect_env_var=True,
+        should_instrument_requests_inprogress=True,
+        excluded_handlers=["/metrics", "/health", "/ready", "/ping"],
+        env_var_name="ENABLE_METRICS",
+        inprogress_name="http_requests_inprogress",
+        inprogress_labels=True,
+    )
+    
+    # Instrumentar la app y exponer endpoint /metrics
+    instrumentator.instrument(app).expose(
+        app,
+        endpoint=settings.METRICS_PATH,
+        include_in_schema=True,
+        tags=["Monitoreo"]
+    )
+    
+    logger.info(f"📊 Métricas Prometheus habilitadas en {settings.METRICS_PATH}")
+
+
+# ==================== INCLUIR ROUTERS ====================
 
 # Incluir los routers de los módulos
 app.include_router(empresa_router.router, prefix="/api/v1/empresas", tags=["Empresas"])
@@ -74,6 +173,9 @@ app.include_router(ventas_router.router, prefix="/api/v1/ventas", tags=["Ventas"
 app.include_router(reportes_router.router, prefix="/api/v1/reportes", tags=["Reportes"])
 app.include_router(alertas_router.router, prefix="/api/v1/alertas", tags=["Alertas"])
 app.include_router(promocion_router, prefix="/api/v1/promociones", tags=["Promociones"])
+
+# Router de Health Checks (sin prefijo para acceso directo)
+app.include_router(health_router, tags=["Monitoreo"])
 
 
 @app.get("/")
