@@ -47,7 +47,7 @@ README.md
 *.sqlite3
 
 # Alembic (migraciones se ejecutan en runtime)
-alembic/versions/*.py
+#alembic/versions/*.py
 
 # Scripts de desarrollo
 test_*.py
