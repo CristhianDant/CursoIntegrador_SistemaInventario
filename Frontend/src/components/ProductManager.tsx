@@ -1662,13 +1662,13 @@ const handleEdit = (product: FinishedProduct) => {
                     <SelectValue placeholder="Selecciona unidad" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="UNIDAD">Unidad</SelectItem>
-                    <SelectItem value="KILOGRAMO">Kilogramo</SelectItem>
-                    <SelectItem value="GRAMO">Gramo</SelectItem>
-                    <SelectItem value="LITRO">Litro</SelectItem>
-                    <SelectItem value="MILILITRO">Mililitro</SelectItem>
-                    <SelectItem value="DOCENA">Docena</SelectItem>
-                    <SelectItem value="CAJA">Caja</SelectItem>
+                    <SelectItem value="UNIDAD">UNIDAD</SelectItem>
+                    <SelectItem value="KG">KG</SelectItem>
+                    <SelectItem value="G">G</SelectItem>
+                    <SelectItem value="L">L</SelectItem>
+                    <SelectItem value="ML">ML</SelectItem>
+                    <SelectItem value="CAJA">CAJA</SelectItem>
+                    <SelectItem value="PAQUETE">PAQUETE</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

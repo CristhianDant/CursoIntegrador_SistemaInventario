@@ -373,13 +373,13 @@ const handleSubmit = async (e: React.FormEvent) => {
           </SelectTrigger>
           <SelectContent>
             {/* Estos deben coincidir EXACTAMENTE con tu UnidadMedidaEnum de Python */}
-            <SelectItem value="KG">Kilogramos</SelectItem>
-            <SelectItem value="G">Gramos</SelectItem>
-            <SelectItem value="L">Litros</SelectItem>
-            <SelectItem value="ML">Mililitros</SelectItem>
-            <SelectItem value="UNIDAD">Unidades</SelectItem>
-            <SelectItem value="CAJA">Caja</SelectItem>
-            <SelectItem value="PAQUETE">Paquete</SelectItem>
+            <SelectItem value="KG">KG</SelectItem>
+            <SelectItem value="G">G</SelectItem>
+            <SelectItem value="L">L</SelectItem>
+            <SelectItem value="ML">ML</SelectItem>
+            <SelectItem value="UNIDAD">UNIDAD</SelectItem>
+            <SelectItem value="CAJA">CAJA</SelectItem>
+            <SelectItem value="PAQUETE">PAQUETE</SelectItem>
           </SelectContent>
         </Select>
       </div>
